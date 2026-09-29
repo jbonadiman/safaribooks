@@ -2071,10 +2071,11 @@ class SafariBooks:
         if fixed_layout:
             root.set("version", "3.0")
 
-            def ensure_property(name, value):
+            def ensure_property(name, value, force=False):
                 for meta in metadata.findall("opf:meta", ns):
                     if meta.get("property") == name:
-                        meta.text = value if name.startswith("rendition:") else meta.text
+                        if force:
+                            meta.text = value
                         return
 
                 created = etree.SubElement(metadata, opf + "meta", {"property": name})
@@ -2082,7 +2083,7 @@ class SafariBooks:
 
             ensure_property("dcterms:modified",
                             (now or datetime.datetime.now(datetime.timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ"))
-            ensure_property("rendition:layout", "pre-paginated")
+            ensure_property("rendition:layout", "pre-paginated", force=True)
             ensure_property("rendition:spread", "none")
             for meta in metadata.findall("opf:meta", ns):
                 cover = items.get(meta.get("content")) if meta.get("name") == "cover" else None

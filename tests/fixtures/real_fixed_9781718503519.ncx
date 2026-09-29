@@ -1,0 +1,563 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1" xml:lang="en-US">
+<head>
+<meta name="dtb:uid" content="9781718503519"/>
+<meta name="dtb:depth" content="1"/>
+<meta name="dtb:totalPageCount" content="250"/>
+<meta name="dtb:maxPageNumber" content="250"/>
+</head>
+<docTitle>
+<text>Electronics for Kids: An Introduction with 21 Fun Projects, 2nd Edition</text>
+</docTitle>
+<docAuthor>
+<text>Øyvind Nydal Dahl</text>
+</docAuthor>
+<navMap>
+
+<navPoint id="i1" playOrder="1">
+<navLabel>
+<text>Section 1</text>
+</navLabel>
+<content src="xhtml/cover.xhtml"/>
+</navPoint>
+
+<navPoint id="i2" playOrder="2">
+<navLabel>
+<text>Section 2</text>
+</navLabel>
+<content src="xhtml/page004.xhtml"/>
+</navPoint>
+<navPoint id="i3" playOrder="3">
+<navLabel>
+<text>Section 3</text>
+</navLabel>
+<content src="xhtml/page005.xhtml"/>
+</navPoint>
+<navPoint id="i4" playOrder="4">
+<navLabel>
+<text>Section 4</text>
+</navLabel>
+<content src="xhtml/page006.xhtml"/>
+</navPoint>
+<navPoint id="i5" playOrder="5">
+<navLabel>
+<text>Section 5</text>
+</navLabel>
+<content src="xhtml/page008.xhtml"/>
+</navPoint>
+<navPoint id="i6" playOrder="6">
+<navLabel>
+<text>Section 6</text>
+</navLabel>
+<content src="xhtml/page010.xhtml"/>
+</navPoint>
+<navPoint id="i7" playOrder="7">
+<navLabel>
+<text>Section 7</text>
+</navLabel>
+<content src="xhtml/page014.xhtml"/>
+</navPoint>
+<navPoint id="i8" playOrder="8">
+<navLabel>
+<text>Section 8</text>
+</navLabel>
+<content src="xhtml/page016.xhtml"/>
+</navPoint>
+<navPoint id="i9" playOrder="9">
+<navLabel>
+<text>Section 9</text>
+</navLabel>
+<content src="xhtml/page018.xhtml"/>
+
+<navPoint id="i10" playOrder="10">
+<navLabel>
+<text>Section 10</text>
+</navLabel>
+<content src="xhtml/page019.xhtml"/>
+</navPoint>
+<navPoint id="i11" playOrder="11">
+<navLabel>
+<text>Section 11</text>
+</navLabel>
+<content src="xhtml/page022.xhtml"/>
+</navPoint>
+</navPoint>
+<navPoint id="i12" playOrder="12">
+<navLabel>
+<text>Section 12</text>
+</navLabel>
+<content src="xhtml/page026.xhtml"/>
+
+<navPoint id="i13" playOrder="13">
+<navLabel>
+<text>Section 13</text>
+</navLabel>
+<content src="xhtml/page028.xhtml"/>
+
+<navPoint id="i14" playOrder="14">
+<navLabel>
+<text>Section 14</text>
+</navLabel>
+<content src="xhtml/page029.xhtml"/>
+</navPoint>
+<navPoint id="i15" playOrder="15">
+<navLabel>
+<text>Section 15</text>
+</navLabel>
+<content src="xhtml/page029.xhtml#page029"/>
+</navPoint>
+<navPoint id="i16" playOrder="16">
+<navLabel>
+<text>Section 16</text>
+</navLabel>
+<content src="xhtml/page030.xhtml"/>
+</navPoint>
+<navPoint id="i17" playOrder="17">
+<navLabel>
+<text>Section 17</text>
+</navLabel>
+<content src="xhtml/page033.xhtml"/>
+</navPoint>
+<navPoint id="i18" playOrder="18">
+<navLabel>
+<text>Section 18</text>
+</navLabel>
+<content src="xhtml/page034.xhtml"/>
+</navPoint>
+</navPoint>
+<navPoint id="i19" playOrder="19">
+<navLabel>
+<text>Section 19</text>
+</navLabel>
+<content src="xhtml/page038.xhtml"/>
+<navPoint id="i20" playOrder="20">
+<navLabel>
+<text>Section 20</text>
+</navLabel>
+<content src="xhtml/page039.xhtml"/>
+</navPoint>
+<navPoint id="i21" playOrder="21">
+<navLabel>
+<text>Section 21</text>
+</navLabel>
+<content src="xhtml/page040.xhtml"/>
+</navPoint>
+<navPoint id="i22" playOrder="22">
+<navLabel>
+<text>Section 22</text>
+</navLabel>
+<content src="xhtml/page042.xhtml"/>
+</navPoint>
+<navPoint id="i23" playOrder="23">
+<navLabel>
+<text>Section 23</text>
+</navLabel>
+<content src="xhtml/page046.xhtml"/>
+</navPoint>
+<navPoint id="i24" playOrder="24">
+<navLabel>
+<text>Section 24</text>
+</navLabel>
+<content src="xhtml/page047.xhtml"/>
+</navPoint>
+</navPoint>
+<navPoint id="i25" playOrder="25">
+<navLabel>
+<text>Section 25</text>
+</navLabel>
+<content src="xhtml/page052.xhtml"/>
+<navPoint id="i26" playOrder="26">
+<navLabel>
+<text>Section 26</text>
+</navLabel>
+<content src="xhtml/page053.xhtml"/>
+</navPoint>
+<navPoint id="i27" playOrder="27">
+<navLabel>
+<text>Section 27</text>
+</navLabel>
+<content src="xhtml/page054.xhtml"/>
+</navPoint>
+<navPoint id="i28" playOrder="28">
+<navLabel>
+<text>Section 28</text>
+</navLabel>
+<content src="xhtml/page056.xhtml"/>
+</navPoint>
+</navPoint>
+</navPoint>
+<navPoint id="i29" playOrder="29">
+<navLabel>
+<text>Section 29</text>
+</navLabel>
+<content src="xhtml/page064.xhtml"/>
+<navPoint id="i30" playOrder="30">
+<navLabel>
+<text>Section 30</text>
+</navLabel>
+<content src="xhtml/page066.xhtml"/>
+<navPoint id="i31" playOrder="31">
+<navLabel>
+<text>Section 31</text>
+</navLabel>
+<content src="xhtml/page067.xhtml"/>
+</navPoint>
+<navPoint id="i32" playOrder="32">
+<navLabel>
+<text>Section 32</text>
+</navLabel>
+<content src="xhtml/page069.xhtml"/>
+</navPoint>
+<navPoint id="i33" playOrder="33">
+<navLabel>
+<text>Section 33</text>
+</navLabel>
+<content src="xhtml/page071.xhtml"/>
+</navPoint>
+<navPoint id="i34" playOrder="34">
+<navLabel>
+<text>Section 34</text>
+</navLabel>
+<content src="xhtml/page076.xhtml"/>
+</navPoint>
+<navPoint id="i35" playOrder="35">
+<navLabel>
+<text>Section 35</text>
+</navLabel>
+<content src="xhtml/page078.xhtml"/>
+</navPoint>
+<navPoint id="i36" playOrder="36">
+<navLabel>
+<text>Section 36</text>
+</navLabel>
+<content src="xhtml/page081.xhtml"/>
+</navPoint>
+</navPoint>
+<navPoint id="i37" playOrder="37">
+<navLabel>
+<text>Section 37</text>
+</navLabel>
+<content src="xhtml/page084.xhtml"/>
+<navPoint id="i38" playOrder="38">
+<navLabel>
+<text>Section 38</text>
+</navLabel>
+<content src="xhtml/page085.xhtml"/>
+</navPoint>
+<navPoint id="i39" playOrder="39">
+<navLabel>
+<text>Section 39</text>
+</navLabel>
+<content src="xhtml/page088.xhtml"/>
+</navPoint>
+<navPoint id="i40" playOrder="40">
+<navLabel>
+<text>Section 40</text>
+</navLabel>
+<content src="xhtml/page090.xhtml"/>
+</navPoint>
+<navPoint id="i41" playOrder="41">
+<navLabel>
+<text>Section 41</text>
+</navLabel>
+<content src="xhtml/page093.xhtml"/>
+</navPoint>
+<navPoint id="i42" playOrder="42">
+<navLabel>
+<text>Section 42</text>
+</navLabel>
+<content src="xhtml/page096.xhtml"/>
+</navPoint>
+</navPoint>
+<navPoint id="i43" playOrder="43">
+<navLabel>
+<text>Section 43</text>
+</navLabel>
+<content src="xhtml/page102.xhtml"/>
+<navPoint id="i44" playOrder="44">
+<navLabel>
+<text>Section 44</text>
+</navLabel>
+<content src="xhtml/page103.xhtml"/>
+</navPoint>
+<navPoint id="i45" playOrder="45">
+<navLabel>
+<text>Section 45</text>
+</navLabel>
+<content src="xhtml/page104.xhtml"/>
+</navPoint>
+<navPoint id="i46" playOrder="46">
+<navLabel>
+<text>Section 46</text>
+</navLabel>
+<content src="xhtml/page104.xhtml#page104"/>
+</navPoint>
+<navPoint id="i47" playOrder="47">
+<navLabel>
+<text>Section 47</text>
+</navLabel>
+<content src="xhtml/page108.xhtml"/>
+</navPoint>
+<navPoint id="i48" playOrder="48">
+<navLabel>
+<text>Section 48</text>
+</navLabel>
+<content src="xhtml/page108.xhtml#page108"/>
+</navPoint>
+</navPoint>
+<navPoint id="i49" playOrder="49">
+<navLabel>
+<text>Section 49</text>
+</navLabel>
+<content src="xhtml/page116.xhtml"/>
+<navPoint id="i50" playOrder="50">
+<navLabel>
+<text>Section 50</text>
+</navLabel>
+<content src="xhtml/page117.xhtml"/>
+</navPoint>
+<navPoint id="i51" playOrder="51">
+<navLabel>
+<text>Section 51</text>
+</navLabel>
+<content src="xhtml/page117.xhtml#page117"/>
+</navPoint>
+<navPoint id="i52" playOrder="52">
+<navLabel>
+<text>Section 52</text>
+</navLabel>
+<content src="xhtml/page121.xhtml"/>
+</navPoint>
+<navPoint id="i53" playOrder="53">
+<navLabel>
+<text>Section 53</text>
+</navLabel>
+<content src="xhtml/page127.xhtml"/>
+</navPoint>
+<navPoint id="i54" playOrder="54">
+<navLabel>
+<text>Section 54</text>
+</navLabel>
+<content src="xhtml/page129.xhtml"/>
+</navPoint>
+<navPoint id="i55" playOrder="55">
+<navLabel>
+<text>Section 55</text>
+</navLabel>
+<content src="xhtml/page130.xhtml"/>
+</navPoint>
+</navPoint>
+<navPoint id="i56" playOrder="56">
+<navLabel>
+<text>Section 56</text>
+</navLabel>
+<content src="xhtml/page136.xhtml"/>
+<navPoint id="i57" playOrder="57">
+<navLabel>
+<text>Section 57</text>
+</navLabel>
+<content src="xhtml/page137.xhtml"/>
+</navPoint>
+<navPoint id="i58" playOrder="58">
+<navLabel>
+<text>Section 58</text>
+</navLabel>
+<content src="xhtml/page138.xhtml"/>
+</navPoint>
+<navPoint id="i59" playOrder="59">
+<navLabel>
+<text>Section 59</text>
+</navLabel>
+<content src="xhtml/page141.xhtml"/>
+</navPoint>
+<navPoint id="i60" playOrder="60">
+<navLabel>
+<text>Section 60</text>
+</navLabel>
+<content src="xhtml/page146.xhtml"/>
+</navPoint>
+<navPoint id="i61" playOrder="61">
+<navLabel>
+<text>Section 61</text>
+</navLabel>
+<content src="xhtml/page146.xhtml#page146"/>
+</navPoint>
+<navPoint id="i62" playOrder="62">
+<navLabel>
+<text>Section 62</text>
+</navLabel>
+<content src="xhtml/page147.xhtml"/>
+</navPoint>
+</navPoint>
+</navPoint>
+<navPoint id="i63" playOrder="63">
+<navLabel>
+<text>Section 63</text>
+</navLabel>
+<content src="xhtml/page156.xhtml"/>
+<navPoint id="i64" playOrder="64">
+<navLabel>
+<text>Section 64</text>
+</navLabel>
+<content src="xhtml/page158.xhtml"/>
+<navPoint id="i65" playOrder="65">
+<navLabel>
+<text>Section 65</text>
+</navLabel>
+<content src="xhtml/page159.xhtml"/>
+</navPoint>
+<navPoint id="i66" playOrder="66">
+<navLabel>
+<text>Section 66</text>
+</navLabel>
+<content src="xhtml/page159.xhtml#page159"/>
+</navPoint>
+<navPoint id="i67" playOrder="67">
+<navLabel>
+<text>Section 67</text>
+</navLabel>
+<content src="xhtml/page161.xhtml"/>
+</navPoint>
+<navPoint id="i68" playOrder="68">
+<navLabel>
+<text>Section 68</text>
+</navLabel>
+<content src="xhtml/page164.xhtml"/>
+</navPoint>
+<navPoint id="i69" playOrder="69">
+<navLabel>
+<text>Section 69</text>
+</navLabel>
+<content src="xhtml/page164.xhtml#page164"/>
+</navPoint>
+</navPoint>
+<navPoint id="i70" playOrder="70">
+<navLabel>
+<text>Section 70</text>
+</navLabel>
+<content src="xhtml/page172.xhtml"/>
+<navPoint id="i71" playOrder="71">
+<navLabel>
+<text>Section 71</text>
+</navLabel>
+<content src="xhtml/page173.xhtml"/>
+</navPoint>
+<navPoint id="i72" playOrder="72">
+<navLabel>
+<text>Section 72</text>
+</navLabel>
+<content src="xhtml/page174.xhtml"/>
+</navPoint>
+<navPoint id="i73" playOrder="73">
+<navLabel>
+<text>Section 73</text>
+</navLabel>
+<content src="xhtml/page176.xhtml"/>
+</navPoint>
+<navPoint id="i74" playOrder="74">
+<navLabel>
+<text>Section 74</text>
+</navLabel>
+<content src="xhtml/page177.xhtml"/>
+</navPoint>
+<navPoint id="i75" playOrder="75">
+<navLabel>
+<text>Section 75</text>
+</navLabel>
+<content src="xhtml/page178.xhtml"/>
+</navPoint>
+<navPoint id="i76" playOrder="76">
+<navLabel>
+<text>Section 76</text>
+</navLabel>
+<content src="xhtml/page180.xhtml"/>
+</navPoint>
+<navPoint id="i77" playOrder="77">
+<navLabel>
+<text>Section 77</text>
+</navLabel>
+<content src="xhtml/page183.xhtml"/>
+</navPoint>
+</navPoint>
+<navPoint id="i78" playOrder="78">
+<navLabel>
+<text>Section 78</text>
+</navLabel>
+<content src="xhtml/page192.xhtml"/>
+<navPoint id="i79" playOrder="79">
+<navLabel>
+<text>Section 79</text>
+</navLabel>
+<content src="xhtml/page193.xhtml"/>
+</navPoint>
+<navPoint id="i80" playOrder="80">
+<navLabel>
+<text>Section 80</text>
+</navLabel>
+<content src="xhtml/page195.xhtml"/>
+</navPoint>
+<navPoint id="i81" playOrder="81">
+<navLabel>
+<text>Section 81</text>
+</navLabel>
+<content src="xhtml/page199.xhtml"/>
+</navPoint>
+<navPoint id="i82" playOrder="82">
+<navLabel>
+<text>Section 82</text>
+</navLabel>
+<content src="xhtml/page200.xhtml"/>
+</navPoint>
+<navPoint id="i83" playOrder="83">
+<navLabel>
+<text>Section 83</text>
+</navLabel>
+<content src="xhtml/page203.xhtml"/>
+</navPoint>
+</navPoint>
+<navPoint id="i84" playOrder="84">
+<navLabel>
+<text>Section 84</text>
+</navLabel>
+<content src="xhtml/page210.xhtml"/>
+<navPoint id="i85" playOrder="85">
+<navLabel>
+<text>Section 85</text>
+</navLabel>
+<content src="xhtml/page211.xhtml"/>
+</navPoint>
+<navPoint id="i86" playOrder="86">
+<navLabel>
+<text>Section 86</text>
+</navLabel>
+<content src="xhtml/page212.xhtml"/>
+</navPoint>
+<navPoint id="i87" playOrder="87">
+<navLabel>
+<text>Section 87</text>
+</navLabel>
+<content src="xhtml/page217.xhtml"/>
+</navPoint>
+<navPoint id="i88" playOrder="88">
+<navLabel>
+<text>Section 88</text>
+</navLabel>
+<content src="xhtml/page227.xhtml"/>
+</navPoint>
+<navPoint id="i89" playOrder="89">
+<navLabel>
+<text>Section 89</text>
+</navLabel>
+<content src="xhtml/page230.xhtml"/>
+</navPoint>
+</navPoint>
+</navPoint>
+<navPoint id="i90" playOrder="90">
+<navLabel>
+<text>Section 90</text>
+</navLabel>
+<content src="xhtml/page240.xhtml"/>
+</navPoint>
+
+</navMap>
+</ncx>

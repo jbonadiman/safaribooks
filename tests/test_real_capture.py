@@ -158,3 +158,87 @@ def test_the_real_ncx_targets_are_the_manifests_documents():
                for p in etree.fromstring(NCX_FILE.read_bytes()).findall(".//ncx:navPoint", NCX_NS)}
 
     assert targets <= opf_hrefs
+
+
+# ---------------------------------------------------------------- publisher's raw fixed-layout package
+FXL_OPF_FILE = FIXTURES / "real_fixed_9781718503519.opf"
+FXL_NCX_FILE = FIXTURES / "real_fixed_9781718503519.ncx"
+FXL_INFO = {"title": "Electronics for Kids, 2nd Edition", "language": "en", "isbn": "9781718503502",
+            "authors": [{"name": "\u00d8yvind Nydal Dahl"}], "publishers": [{"name": "No Starch Press"}],
+            "issued": "2026-06-30", "description": "<div><p>Synopsis.</p></div>"}
+
+
+@pytest.fixture
+def fxl_oebps(tmp_path):
+    root = tmp_path / "OEBPS"
+    for item in etree.fromstring(FXL_OPF_FILE.read_bytes()).findall("opf:manifest/opf:item", NS):
+        target = root / item.get("href")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"x")
+    return str(root)
+
+
+def fxl_patch(oebps, opf_bytes=None):
+    return etree.fromstring(SafariBooks.patch_opf_document(
+        opf_bytes or FXL_OPF_FILE.read_bytes(), "content.opf", oebps, now=NOW, book_info=FXL_INFO, fixed_layout=True))
+
+
+def rendition(root):
+    return {m.get("property"): m.text for m in root.findall("opf:metadata/opf:meta", NS)
+            if (m.get("property") or "").startswith("rendition:")}
+
+
+def test_the_publishers_spread_and_orientation_survive_on_a_real_fixed_layout_opf(fxl_oebps):
+    # The publisher declares spread "auto" and pages marked page-spread-left/right; "none" would forbid
+    # the two-page spreads its spine is built for.
+    assert rendition(fxl_patch(fxl_oebps)) == {
+        "rendition:layout": "pre-paginated", "rendition:spread": "auto", "rendition:orientation": "landscape"}
+
+
+def test_the_spread_defaults_to_none_when_the_publisher_declares_none(fxl_oebps):
+    raw = FXL_OPF_FILE.read_bytes().replace(b'<meta property="rendition:spread">auto</meta>', b"")
+    assert b"rendition:spread" not in raw
+
+    assert rendition(fxl_patch(fxl_oebps, raw))["rendition:spread"] == "none"
+
+
+def test_a_layout_that_disagrees_with_the_detected_fixed_layout_is_corrected(fxl_oebps):
+    raw = FXL_OPF_FILE.read_bytes().replace(b">pre-paginated<", b">reflowable<")
+
+    assert rendition(fxl_patch(fxl_oebps, raw))["rendition:layout"] == "pre-paginated"
+
+
+def test_a_real_fixed_layout_opf_keeps_its_guide_spine_pages_and_cover(fxl_oebps):
+    root = fxl_patch(fxl_oebps)
+    spine = root.find("opf:spine", NS)
+
+    assert [(g.get("type"), g.get("href")) for g in root.findall("opf:guide/opf:reference", NS)] == [
+        ("cover", "xhtml/cover.xhtml"), ("text", "xhtml/page026.xhtml")]
+    assert len(spine) == 247 and spine.get("toc") == "ncx"
+    assert {r.get("properties") for r in spine if r.get("properties")} == {"page-spread-left", "page-spread-right"}
+    assert len(root.findall("opf:manifest/opf:item", NS)) == 640
+
+
+def test_a_real_fixed_layout_opf_gets_the_print_isbn_the_publisher_only_gave_as_source(fxl_oebps):
+    root = fxl_patch(fxl_oebps)
+    identifiers = [e.text for e in root.findall("opf:metadata/dc:identifier", NS)]
+
+    assert identifiers == ["9781718503519", "urn:isbn:9781718503502"]
+    assert root.get("unique-identifier") == "e9781718503519"
+
+
+def test_a_real_fixed_layout_opf_is_stable_under_a_second_patch(fxl_oebps):
+    first = SafariBooks.patch_opf_document(FXL_OPF_FILE.read_bytes(), "content.opf", fxl_oebps, now=NOW,
+                                           book_info=FXL_INFO, fixed_layout=True)
+    second = SafariBooks.patch_opf_document(first, "content.opf", fxl_oebps, now=NOW,
+                                            book_info=FXL_INFO, fixed_layout=True)
+
+    assert first == second
+
+
+def test_the_real_fixed_layout_ncx_has_90_entries_every_one_in_the_manifest():
+    ncx = etree.fromstring(FXL_NCX_FILE.read_bytes())
+    manifest = {i.get("href") for i in etree.fromstring(FXL_OPF_FILE.read_bytes()).findall("opf:manifest/opf:item", NS)}
+    targets = [c.get("src").split("#")[0] for c in ncx.iter("{%s}content" % NCX_NS["ncx"])]
+
+    assert len(targets) == 90 and set(targets) <= manifest

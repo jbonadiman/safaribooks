@@ -42,19 +42,25 @@ $ uv sync
 
 Run the program with `uv run python safaribooks.py ...` (or activate `.venv` first).
 
-The program depends of only two **Python _3_** modules:
+The program depends on four **Python _3_** modules (`uv sync` installs them):
 ```python3
 lxml>=4.1.1
 requests>=2.20.0
+pillow>=12.3.0
+tinycss2>=1.5.1
 ```
+Calibre's `ebook-polish` is optional: if it is on your `PATH` the script uses it at the end.
   
 ## Usage:
-It's really simple to use, just choose a book from the library and replace in the following command:
-  * X-es with its ID, 
-  * `email:password` with your own. 
+Log in to O'Reilly in your browser and save the session as `cookies.json` next to `safaribooks.py`
+(run `uv run --with browser_cookie3 python retrieve_cookies.py`, or paste the output of
+`cookieExtractor.js` from the browser console into the file). `--cred` and `--login` are disabled
+for now, see [issue #358](https://github.com/lorenzodifuccia/safaribooks/issues/358).
+
+Then replace the X-es with the ID of the book you want:
 
 ```shell
-$ python3 safaribooks.py --cred "account_mail@mail.com:password01" XXXXXXXXXXXXX
+$ uv run python safaribooks.py XXXXXXXXXXXXX
 ```
 
 The ID is the digits that you find in the URL of the book description page:  
@@ -100,12 +106,10 @@ optional arguments:
   --help                Show this help message.
 ```
   
-The first time you use the program, you'll have to specify your Safari Books Online account credentials (look [`here`](/../../issues/15) for special character).  
-The next times you'll download a book, before session expires, you can omit the credential, because the program save your session cookies in a file called `cookies.json`.  
-For **SSO**, please use the `sso_cookies.py` program in order to create the `cookies.json` file from the SSO cookies retrieved by your browser session (please follow [`these steps`](/../../issues/150#issuecomment-555423085)).  
+The program reads your session from `cookies.json` (see [Usage](#usage)), and refreshes that file after a successful download so the next run keeps working until the session expires. This also covers **SSO** accounts: log in with your browser, then export the cookies with `retrieve_cookies.py` or `cookieExtractor.js` (see [`these steps`](https://github.com/lorenzodifuccia/safaribooks/issues/150#issuecomment-555423085)).  
   
-Pay attention if you use a shared PC, because everyone that has access to your files can steal your session. 
-If you don't want to cache the cookies, just use the `--no-cookies` option and provide all time your credential through the `--cred` option or the more safe `--login` one: this will prompt you for credential during the script execution.
+Pay attention if you use a shared PC, because everyone that has access to your files can steal your session.  
+`--no-cookies` only applies to the disabled `--cred` login, so it is rejected on its own.
 
 You can configure proxies by setting on your system the environment variable `HTTPS_PROXY` or using the `USE_PROXY` directive into the script.
 
@@ -124,61 +128,21 @@ In this case, I suggest you to convert the `EPUB` to `AZW3` with Calibre or to `
 ## Examples:
   * ## Download [Test-Driven Development with Python, 2nd Edition](https://www.safaribooksonline.com/library/view/test-driven-development-with/9781491958698/):  
     ```shell
-    $ python3 safaribooks.py --cred "my_email@gmail.com:MyPassword1!" 9781491958698
-
-           ____     ___         _ 
-          / __/__ _/ _/__ _____(_)
-         _\ \/ _ `/ _/ _ `/ __/ / 
-        /___/\_,_/_/ \_,_/_/ /_/  
-          / _ )___  ___  / /__ ___
-         / _  / _ \/ _ \/  '_/(_-<
-        /____/\___/\___/_/\_\/___/
-
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    [-] Logging into Safari Books Online...
-    [*] Retrieving book info... 
-    [-] Title: Test-Driven Development with Python, 2nd Edition                     
-    [-] Authors: Harry J.W. Percival                                                
-    [-] Identifier: 9781491958698                                                   
-    [-] ISBN: 9781491958704                                                         
-    [-] Publishers: O'Reilly Media, Inc.                                            
-    [-] Rights: Copyright © O'Reilly Media, Inc.                                    
-    [-] Description: By taking you through the development of a real web application 
-    from beginning to end, the second edition of this hands-on guide demonstrates the 
-    practical advantages of test-driven development (TDD) with Python. You’ll learn 
-    how to write and run tests before building each part of your app, and then develop
-    the minimum amount of code required to pass those tests. The result? Clean code
-    that works.In the process, you’ll learn the basics of Django, Selenium, Git, 
-    jQuery, and Mock, along with curre...
-    [-] Release Date: 2017-08-18
-    [-] URL: https://learning.oreilly.com/library/view/test-driven-development-with/9781491958698/
-    [*] Retrieving book chapters...                                                 
-    [*] Output directory:                                                           
-        /XXXX/safaribooks/Books/Test-Driven Development with Python 2nd Edition (9781491958698)
-    [-] Downloading book contents... (53 chapters)                                  
-        [#####################################################################] 100%
-    [-] Downloading book CSSs... (2 files)                                          
-        [#####################################################################] 100%
-    [-] Downloading book images... (142 files)                                      
-        [#####################################################################] 100%
-    [-] Creating EPUB file...                                                       
-    [*] Done: /XXXX/safaribooks/Books/Test-Driven Development with Python 2nd Edition 
-    (9781491958698)/9781491958698.epub
-    
-        If you like it, please * this project on GitHub to make it known:
-            https://github.com/lorenzodifuccia/safaribooks
-        e don't forget to renew your Safari Books Online subscription:
-            https://learning.oreilly.com
-    
-    [!] Bye!!
+    $ uv run python safaribooks.py 9781491958698
     ```  
-     The result will be (opening the `EPUB` file with Calibre):  
+    The script prints the book information (title, authors, publishers, ISBN, release date), then one
+    progress bar per stage: documents, stylesheets, fonts, images, image optimization, and finally
+    `Creating EPUB file...`. The result is `Books/<Title> (<ID>)/<ID>.epub`; open it with Calibre or any reader.  
 
-    ![Book Appearance](https://github.com/lorenzodifuccia/cloudflare/raw/master/Images/safaribooks/safaribooks_example01_TDD.png "Book opened with Calibre")  
- 
+  * ## Keep the book exactly as published (no optimization):
+    ```shell
+    $ uv run python safaribooks.py --no-optimize-images --no-optimize-css 9781491958698
+    ```  
+    Images stay as the publisher ships them, and the `color` property stays in the stylesheets.  
+
   * ## Use or not the `--kindle` option:
     ```bash
-    $ python3 safaribooks.py --kindle 9781491958698
+    $ uv run python safaribooks.py --kindle 9781491958698
     ```  
     On the right, the book created with `--kindle` option, on the left without (default):  
     

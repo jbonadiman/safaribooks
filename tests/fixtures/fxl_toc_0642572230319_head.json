@@ -1,0 +1,85 @@
+[
+ {
+  "depth": 1,
+  "reference_id": "0642572230319-/xhtml/cover.xhtml",
+  "ourn": "urn:orm:book:0642572230319:chapter:xhtml%2fcover.xhtml",
+  "url": "https://learning.oreilly.com/api/v2/epub-chapters/urn:orm:book:0642572230319:chapter:xhtml%252fcover.xhtml/",
+  "fragment": "",
+  "title": "Cover",
+  "duration": 69.0,
+  "children": []
+ },
+ {
+  "depth": 1,
+  "reference_id": "0642572230319-/xhtml/page018.xhtml",
+  "ourn": "urn:orm:book:0642572230319:chapter:xhtml%2fpage018.xhtml",
+  "url": "https://learning.oreilly.com/api/v2/epub-chapters/urn:orm:book:0642572230319:chapter:xhtml%252fpage018.xhtml/",
+  "fragment": "",
+  "title": "Introduction",
+  "duration": 69.0,
+  "children": [
+   {
+    "depth": 2,
+    "reference_id": "0642572230319-/xhtml/page019.xhtml",
+    "ourn": "urn:orm:book:0642572230319:chapter:xhtml%2fpage019.xhtml",
+    "url": "https://learning.oreilly.com/api/v2/epub-chapters/urn:orm:book:0642572230319:chapter:xhtml%252fpage019.xhtml/",
+    "fragment": "",
+    "title": "About This Book",
+    "duration": 138.0,
+    "children": []
+   },
+   {
+    "depth": 2,
+    "reference_id": "0642572230319-/xhtml/page022.xhtml",
+    "ourn": "urn:orm:book:0642572230319:chapter:xhtml%2fpage022.xhtml",
+    "url": "https://learning.oreilly.com/api/v2/epub-chapters/urn:orm:book:0642572230319:chapter:xhtml%252fpage022.xhtml/",
+    "fragment": "",
+    "title": "Your Electronics Lab",
+    "duration": 138.0,
+    "children": []
+   }
+  ]
+ },
+ {
+  "depth": 1,
+  "reference_id": "0642572230319-/xhtml/page156.xhtml",
+  "ourn": "urn:orm:book:0642572230319:chapter:xhtml%2fpage156.xhtml",
+  "url": "https://learning.oreilly.com/api/v2/epub-chapters/urn:orm:book:0642572230319:chapter:xhtml%252fpage156.xhtml/",
+  "fragment": "",
+  "title": "PART III: The Digital World",
+  "duration": 69.0,
+  "children": [
+   {
+    "depth": 2,
+    "reference_id": "0642572230319-/xhtml/page158.xhtml",
+    "ourn": "urn:orm:book:0642572230319:chapter:xhtml%2fpage158.xhtml",
+    "url": "https://learning.oreilly.com/api/v2/epub-chapters/urn:orm:book:0642572230319:chapter:xhtml%252fpage158.xhtml/",
+    "fragment": "",
+    "title": "Chapter 9: The Basics of Digital Electronics",
+    "duration": 69.0,
+    "children": [
+     {
+      "depth": 3,
+      "reference_id": "0642572230319-/xhtml/page159.xhtml",
+      "ourn": "urn:orm:book:0642572230319:chapter:xhtml%2fpage159.xhtml",
+      "url": "https://learning.oreilly.com/api/v2/epub-chapters/urn:orm:book:0642572230319:chapter:xhtml%252fpage159.xhtml/",
+      "fragment": "",
+      "title": "Ones and Zeros as Voltages",
+      "duration": 138.0,
+      "children": []
+     },
+     {
+      "depth": 3,
+      "reference_id": "0642572230319-/xhtml/page159.xhtml",
+      "ourn": "urn:orm:book:0642572230319:chapter:xhtml%2fpage159.xhtml",
+      "url": "https://learning.oreilly.com/api/v2/epub-chapters/urn:orm:book:0642572230319:chapter:xhtml%252fpage159.xhtml/",
+      "fragment": "",
+      "title": "Meet the Binary Number System",
+      "duration": 138.0,
+      "children": []
+     }
+    ]
+   }
+  ]
+ }
+]

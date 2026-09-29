@@ -1,0 +1,82 @@
+{
+ "count": 641,
+ "next": null,
+ "previous": null,
+ "results": [
+  {
+   "ourn": "urn:orm:book:0642572230319:chapter:xhtml%2fcover.xhtml",
+   "url": "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:0642572230319/files/xhtml/cover.xhtml",
+   "full_path": "xhtml/cover.xhtml",
+   "filename": "cover.xhtml",
+   "filename_ext": ".xhtml",
+   "media_type": "application/xhtml+xml",
+   "has_mathml": false,
+   "kind": "chapter",
+   "created_time": "2026-03-25T14:57:28.649289Z",
+   "last_modified_time": "2026-03-25T14:59:55.559004Z",
+   "virtual_pages": 1,
+   "file_size": 1003,
+   "epub_archive": "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:0642572230319/"
+  },
+  {
+   "ourn": "urn:orm:book:0642572230319:asset:styles%2fstylesheet_001-025.css",
+   "url": "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:0642572230319/files/styles/stylesheet_001-025.css",
+   "full_path": "styles/stylesheet_001-025.css",
+   "filename": "stylesheet_001-025.css",
+   "filename_ext": ".css",
+   "media_type": "text/css",
+   "has_mathml": false,
+   "kind": "stylesheet",
+   "created_time": "2026-03-25T14:55:39.031976Z",
+   "last_modified_time": "2026-03-25T14:55:39.031991Z",
+   "virtual_pages": null,
+   "file_size": 73626,
+   "epub_archive": "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:0642572230319/"
+  },
+  {
+   "ourn": "urn:orm:book:0642572230319:asset:images%2fcover.jpg",
+   "url": "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:0642572230319/files/images/cover.jpg",
+   "full_path": "images/cover.jpg",
+   "filename": "cover.jpg",
+   "filename_ext": ".jpg",
+   "media_type": "image/jpeg",
+   "has_mathml": false,
+   "kind": "image",
+   "created_time": "2026-03-25T14:56:09.264709Z",
+   "last_modified_time": "2026-03-25T14:56:09.264726Z",
+   "virtual_pages": null,
+   "file_size": 1327944,
+   "epub_archive": "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:0642572230319/"
+  },
+  {
+   "ourn": "urn:orm:book:0642572230319:asset:fonts%2fAvenir-Black.ttf",
+   "url": "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:0642572230319/files/fonts/Avenir-Black.ttf",
+   "full_path": "fonts/Avenir-Black.ttf",
+   "filename": "Avenir-Black.ttf",
+   "filename_ext": ".ttf",
+   "media_type": "font/ttf",
+   "has_mathml": false,
+   "kind": "font",
+   "created_time": "2026-03-25T14:56:01.862628Z",
+   "last_modified_time": "2026-03-25T14:56:01.862666Z",
+   "virtual_pages": null,
+   "file_size": 91020,
+   "epub_archive": "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:0642572230319/"
+  },
+  {
+   "ourn": "urn:orm:book:0642572230319:asset:fonts%2fDogmaOT-Bold.otf",
+   "url": "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:0642572230319/files/fonts/DogmaOT-Bold.otf",
+   "full_path": "fonts/DogmaOT-Bold.otf",
+   "filename": "DogmaOT-Bold.otf",
+   "filename_ext": ".otf",
+   "media_type": "font/otf",
+   "has_mathml": false,
+   "kind": "other_asset",
+   "created_time": "2026-03-25T14:56:02.523986Z",
+   "last_modified_time": "2026-03-25T14:56:02.524014Z",
+   "virtual_pages": null,
+   "file_size": 25552,
+   "epub_archive": "https://learning.oreilly.com/api/v2/epubs/urn:orm:book:0642572230319/"
+  }
+ ]
+}

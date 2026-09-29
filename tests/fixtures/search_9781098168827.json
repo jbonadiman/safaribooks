@@ -1,0 +1,110 @@
+{
+ "results": [
+  {
+   "id": "https://www.safaribooksonline.com/api/v1/book/9781098168827/",
+   "archive_id": "9781098168827",
+   "ourn": "urn:orm:book:9781098168827",
+   "isbn": "9781718503762",
+   "last_modified_time": "2024-09-23T20:11:49.339Z",
+   "issued": "2024-04-16T00:00:00Z",
+   "format": "book",
+   "content_format": "book",
+   "authors": [
+    "Sebastian Raschka"
+   ],
+   "publishers": [
+    "No Starch Press"
+   ],
+   "academic_excluded": false,
+   "language": "en",
+   "title": "Machine Learning Q and AI",
+   "description": "<span><div><p>If you're ready to venture beyond introductory concepts and dig deeper into machine learning, deep learning, and AI, the question-and-answer format of <i>Machine Learning Q and AI</i> will make things fast and easy for you, without a lot of mucking about.</p><p>Born out of questions often fielded by author Sebastian Raschka, the direct, no-nonsense approach of this book makes advanced topics more accessible and genuinely engaging. Each brief, self-contained chapter journeys through a fundamental question in AI, unraveling it with clear explanations, diagrams, and hands-on exercises.</p><p><strong>WHAT'S INSIDE:</strong></p><p><strong>FOCUSED CHAPTERS:</strong> Key questions in AI are answered concisely, and complex ideas are broken down into easily digestible parts.</p><p><strong>WIDE RANGE OF TOPICS:</strong> Raschka covers topics ranging from neural network architectures and model evaluation to computer vision and natural language processing.</p><p><strong>PRACTICAL APPLICATIONS:</strong> Learn techniques for enhancing model performance, fine-tuning large models, and more.</p><p>You'll also explore how to:</p><ul><li>Manage the various sources of randomness in neural network training</li><li>Differentiate between encoder and decoder architectures in large language models</li><li>Reduce overfitting through data and model modifications</li><li>Construct confidence intervals for classifiers and optimize models with limited labeled data</li><li>Choose between different multi-GPU training paradigms and different types of generative AI models</li><li>Understand performance metrics for natural language processing</li><li>Make sense of the inductive biases in vision transformers</li></ul><p>If you've been on the hunt for the perfect resource to elevate your understanding of machine learning, <i>Machine Learning Q and AI</i> will make it easy for you to painlessly advance your knowledge beyond the basics.</p></div></span>",
+   "url": "https://learning.oreilly.com/api/v1/book/9781098168827/",
+   "web_url": "/library/view/machine-learning-q/9781098168827/",
+   "source": "application/epub+zip",
+   "content_type": "book",
+   "virtual_pages": 322,
+   "duration_seconds": -1,
+   "has_assessment": false,
+   "timestamp": "2024-09-23T20:12:49.555Z",
+   "average_rating": 5000,
+   "number_of_followers": 0,
+   "number_of_items": 0,
+   "number_of_reviews": 4,
+   "popularity": 985951831,
+   "report_score": 20000,
+   "cover_url": "https://learning.oreilly.com/library/cover/9781098168827/",
+   "date_added": "2024-02-20T16:35:33.850Z",
+   "topics": [
+    "4bb765a4-8b6a-4496-b7d4-0cbf2171743c"
+   ],
+   "topics_payload": [
+    {
+     "uuid": "4bb765a4-8b6a-4496-b7d4-0cbf2171743c",
+     "slug": "machine-learning",
+     "name": "Machine Learning",
+     "score": null
+    }
+   ],
+   "minutes_required": 370.3
+  }
+ ],
+ "facets": {
+  "facet_queries": {
+   "{!ex=format}(format:video AND title_unstemmed:\"Learning Path: .*\")": 0
+  },
+  "facet_fields": {
+   "format": [
+    "book",
+    1
+   ],
+   "subjects": [],
+   "topic_uuids": [
+    "4bb765a4-8b6a-4496-b7d4-0cbf2171743c",
+    1
+   ],
+   "publishers_exact": [
+    "No Starch Press",
+    1
+   ],
+   "language": [
+    "en",
+    1
+   ],
+   "sharing_status": [],
+   "expert_playlist": [],
+   "video_classification": [],
+   "certification_name_exact": [],
+   "certification_vendor_name_exact": [],
+   "topics": [
+    "Machine Learning",
+    1
+   ]
+  },
+  "facet_ranges": {},
+  "facet_intervals": {
+   "average_rating": {
+    "no_stars": 0,
+    "zero_stars": 1,
+    "one_star": 1,
+    "two_stars": 1,
+    "three_stars": 1,
+    "four_stars": 1,
+    "five_stars": 1
+   },
+   "issued": {
+    "last_two_years": 0,
+    "last_year": 0,
+    "last_six_months": 0
+   }
+  },
+  "facet_heatmaps": {}
+ },
+ "total": 1,
+ "meta": {
+  "query_identifier": "a3aa60c1-41f3-480b-b8c0-e08f052ef28a"
+ },
+ "page": 0,
+ "previous": null,
+ "next": null
+}

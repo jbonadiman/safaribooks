@@ -1794,7 +1794,8 @@ class SafariBooks:
             for author in book_info.get("authors") or []:
                 name = (author.get("name") or "").strip()
                 if name and name != "n/a":
-                    add_after_title("creator", name)
+                    # As the old generator wrote them: readers (Calibre) sort and label by these two.
+                    add_after_title("creator", name, **{opf + "role": "aut", opf + "file-as": name})
 
         def clean_names(key):
             """Non-blank names of a {"name": ...} list; get_book_info() turns a null field into "n/a"."""

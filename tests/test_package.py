@@ -106,6 +106,33 @@ def test_patch_opf_never_overwrites_a_creator_the_publisher_supplied(tmp_path):
     assert text_of(root, "creator") == ["Original Author"]
 
 
+def test_patch_opf_marks_added_creators_as_authors_with_a_sort_key(tmp_path):
+    # The old generator wrote opf:role="aut" and opf:file-as; Calibre labels and sorts by them.
+    root = patch(tmp_path, book_info={"authors": [{"name": "Neal Ford"}, {"name": "Mark Richards"}]})
+    creators = root.findall("opf:metadata/dc:creator", NS)
+    opf_ns = "{%s}" % NS["opf"]
+
+    assert [c.get(opf_ns + "role") for c in creators] == ["aut", "aut"]
+    assert [c.get(opf_ns + "file-as") for c in creators] == ["Neal Ford", "Mark Richards"]
+
+
+def test_patch_opf_serialises_the_creator_attributes_with_the_opf_prefix(tmp_path):
+    # ns0:role would be valid XML but is not what readers, or the old output, looked like
+    raw = SafariBooks.patch_opf_document(
+        opf_xml(manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE), "content.opf", on_disk(tmp_path, FILES),
+        now=NOW, book_info={"authors": [{"name": "Neal Ford"}]})
+
+    assert b'opf:role="aut"' in raw and b'opf:file-as="Neal Ford"' in raw and b"ns0:" not in raw
+
+
+def test_patch_opf_leaves_a_publisher_supplied_creator_exactly_as_it_was(tmp_path):
+    opf = opf_xml(metadata='<dc:creator>Original Author</dc:creator>', manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
+    root = patch(tmp_path, opf, book_info={"authors": [{"name": "Someone Else"}]})
+    creator = root.find("opf:metadata/dc:creator", NS)
+
+    assert creator.text == "Original Author" and dict(creator.attrib) == {}
+
+
 def test_patch_opf_prefers_the_search_apis_publisher_over_the_opfs_own_spelling(tmp_path):
     # The OPF of a No Starch Press book says "No Starch Press Inc."; the catalogue (and the old
     # generator's output) says "No Starch Press". The catalogue name is the one readers showed.

@@ -5,36 +5,22 @@ Before any usage please read the *O'Reilly*'s [Terms of Service](https://learnin
 
 <a href='https://ko-fi.com/Y8Y0MPEGU' target='_blank'><img height='80' style='border:0px;height:60px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com'/></a>
 
-## ✨✨ *Attention needed* ✨✨
-- This project is no longer actively maintained.  
-- *Login through `safaribooks` no longer works due to changes in ORLY APIs.*
-- *The program needs a major refactor to include new features and integrate new APIs.*
-- **However... it still work for downloading books.**  
-(Use SSO hack: log in via browser, then copy cookies into `cookies.json`, see below and issues. Love ❤️)
-- **2026 update: the `/api/v1/book/` endpoints used by `safaribooks.py` now return `404`.** Use [`download_v2.py`](#download_v2py-api-v2) instead, it rebuilds the EPUB from the v2 API.
+## How it works
+`safaribooks.py` downloads the book through the v2 API, `/api/v2/epubs/urn:orm:book:<ID>/files/`. That endpoint lists **every file of the EPUB as O'Reilly published it** (package document, NCX, stylesheets, fonts, images and chapters), so the script fetches those files and zips them back together instead of rebuilding the book from rendered HTML. The publisher's manifest, reading order, folder layout, stylesheets, fonts and table of contents are kept.
+
+What is changed on the way, all of it with an opt-out:
+
+- Anti-bot markup that Akamai injects into pages (`<script>`, root-relative `<link>`, `#sec-overlay`) is removed.
+- The title and language of the OPF are replaced with those of the edition you downloaded (translated books ship the English ones). A missing author or publisher is filled in from the search API, or from the NCX `docAuthor`.
+- Images are converted to JPEG, unused ones are dropped, and Calibre's `ebook-polish` runs if it is installed. Skip all of it with `--no-optimize-images`.
+- The `color` property is removed from stylesheets and inline styles so light/dark reader themes keep working. Skip it with `--no-optimize-css`.
+- Fixed-layout (PDF-style) books are detected and declared `pre-paginated`, with the page size pinned, the publisher's `scale()` baked into the numbers, and a nav document built from the NCX. Colours are left alone there, and the polish step is skipped.
+
+Downloads are resumable. Files already in `Books/<Title> (<ID>)/OEBPS/` are not fetched again, so when Akamai answers `403` for a while (the script already retries those with a growing delay), wait a few minutes and run the same command again.
+
+Log in through your browser and hand the session to the script as `cookies.json` (see [Usage](#usage) and `retrieve_cookies.py`). Only the `orm-jwt` and `orm-rt` cookies are needed. Do not send requests with an old browser `User-Agent`: O'Reilly invalidates the session as soon as it sees one.
 
 ---
-
-## `download_v2.py` (API v2)
-O'Reilly removed the v1 API, so `safaribooks.py` stops right after the login with a `JSONDecodeError`.  
-`download_v2.py` downloads the same book through `/api/v2/epubs/urn:orm:book:<ID>/files/`, which exposes every file of the original EPUB (OPF, NCX, CSS, fonts, images and chapters), and packs them into `Books/<Title> (<ID>)/<ID>.epub`.
-
-1. Log in to https://learning.oreilly.com with your browser.
-2. Create `cookies.json` next to the scripts with, at least, the `orm-jwt` and `orm-rt` cookies  
-   (DevTools → *Application* → *Cookies* → `https://learning.oreilly.com`, or run `retrieve_cookies.py`):
-   ```json
-   {"orm-jwt": "eyJ...", "orm-rt": "24ec..."}
-   ```
-3. Run it with the book ID (the digits in the book URL):
-   ```shell
-   $ python3 download_v2.py 9798341630505
-   [*] Fundamentos de la arquitectura de software, 2.ª edición
-   [*] 292 files
-   [-] Done: .../Books/Fundamentos de la arquitectura de software, 2.ª edición (9798341630505)/9798341630505.epub
-   ```
-
-Files already present in `Books/<Title> (<ID>)/OEBPS/` are skipped, so if O'Reilly's anti-bot (Akamai) answers `403` for a while, wait a few minutes and run the same command again to resume.  
-Do not send requests with an old browser `User-Agent`: O'Reilly invalidates the session (`orm-jwt`) as soon as it sees one, which is why the headers of `safaribooks.py` were updated too.
 
 ## Overview:
   * [Requirements & Setup](#requirements--setup)
@@ -77,33 +63,41 @@ Like: `https://www.safaribooksonline.com/library/view/test-driven-development-wi
   
 #### Program options:
 ```shell
-$ python3 safaribooks.py --help
+$ uv run python safaribooks.py --help
 usage: safaribooks.py [--cred <EMAIL:PASS> | --login] [--no-cookies]
-                      [--kindle] [--preserve-log] [--help]
+                      [--kindle] [--preserve-log] [--no-optimize-images]
+                      [--no-optimize-css] [--help]
                       <BOOK ID>
 
 Download and generate an EPUB of your favorite books from Safari Books Online.
 
 positional arguments:
-  <BOOK ID>            Book digits ID that you want to download. You can find
-                       it in the URL (X-es):
-                       `https://learning.oreilly.com/library/view/book-
-                       name/XXXXXXXXXXXXX/`
+  <BOOK ID>             Book digits ID that you want to download. You can find
+                        it in the URL (X-es):
+                        `https://learning.oreilly.com/library/view/book-
+                        name/XXXXXXXXXXXXX/`
 
 optional arguments:
-  --cred <EMAIL:PASS>  Credentials used to perform the auth login on Safari
-                       Books Online. Es. ` --cred
-                       "account_mail@mail.com:password01" `.
-  --login              Prompt for credentials used to perform the auth login
-                       on Safari Books Online.
-  --no-cookies         Prevent your session data to be saved into
-                       `cookies.json` file.
-  --kindle             Add some CSS rules that block overflow on `table` and
-                       `pre` elements. Use this option if you're going to
-                       export the EPUB to E-Readers like Amazon Kindle.
-  --preserve-log       Leave the `info_XXXXXXXXXXXXX.log` file even if there
-                       isn't any error.
-  --help               Show this help message.
+  --cred <EMAIL:PASS>   Credentials used to perform the auth login on Safari
+                        Books Online. Es. ` --cred
+                        "account_mail@mail.com:password01" `.
+  --login               Prompt for credentials used to perform the auth login
+                        on Safari Books Online.
+  --no-cookies          Prevent your session data to be saved into
+                        `cookies.json` file.
+  --kindle              Add some CSS rules that block overflow on `table` and
+                        `pre` elements. Use this option if you're going to
+                        export the EPUB to E-Readers like Amazon Kindle.
+  --preserve-log        Leave the `info_XXXXXXXXXXXXX.log` file even if there
+                        isn't any error.
+  --no-optimize-images  Skip converting images to JPEG, pruning unused images,
+                        and running Calibre's `ebook-polish` (unused CSS
+                        removal + lossless image compression) at the end of
+                        the download.
+  --no-optimize-css     Skip removing the `color` CSS property from
+                        stylesheets and inline `style` attributes (kept to
+                        avoid breaking E-Reader light/dark themes by default).
+  --help                Show this help message.
 ```
   
 The first time you use the program, you'll have to specify your Safari Books Online account credentials (look [`here`](/../../issues/15) for special character).  
@@ -116,14 +110,13 @@ If you don't want to cache the cookies, just use the `--no-cookies` option and p
 You can configure proxies by setting on your system the environment variable `HTTPS_PROXY` or using the `USE_PROXY` directive into the script.
 
 #### Calibre EPUB conversion
-**Important**: since the script only download HTML pages and create a raw EPUB, many of the CSS and XML/HTML directives are wrong for an E-Reader. To ensure best quality of the output, I suggest you to always convert the `EPUB` obtained by the script to standard-`EPUB` with [Calibre](https://calibre-ebook.com/).
-You can also use the command-line version of Calibre with `ebook-convert`, e.g.:
+The EPUB is now the publisher's own, so converting it is no longer needed to get a valid book. It is still useful to change format, e.g. for Kindle, with `ebook-convert`:
 ```bash
-$ ebook-convert "XXXX/safaribooks/Books/Test-Driven Development with Python 2nd Edition (9781491958698)/9781491958698.epub" "XXXX/safaribooks/Books/Test-Driven Development with Python 2nd Edition (9781491958698)/9781491958698_CLEAR.epub"
+$ ebook-convert "Books/<Title> (<ID>)/<ID>.epub" "Books/<Title> (<ID>)/<ID>.azw3"
 ```
-After the execution, you can read the `9781491958698_CLEAR.epub` in every E-Reader and delete all other files.
+If Calibre is installed, `ebook-polish` already runs at the end of the download (unless you pass `--no-optimize-images`).
 
-The program offers also an option to ensure best compatibilities for who wants to export the `EPUB` to E-Readers like Amazon Kindle: `--kindle`, it blocks overflow on `table` and `pre` elements (see [example](#use-or-not-the---kindle-option)).  
+The program also offers an option to ensure best compatibility for who wants to export the `EPUB` to E-Readers like Amazon Kindle: `--kindle`, it blocks overflow on `table` and `pre` elements (see [example](#use-or-not-the---kindle-option)).  
 In this case, I suggest you to convert the `EPUB` to `AZW3` with Calibre or to `MOBI`, remember in this case to select `Ignore margins` in the conversion options:  
   
 ![Calibre IgnoreMargins](https://github.com/lorenzodifuccia/cloudflare/raw/master/Images/safaribooks/safaribooks_calibre_IgnoreMargins.png "Select Ignore margins")  

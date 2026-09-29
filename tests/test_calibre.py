@@ -64,3 +64,49 @@ def test_the_default_build_runs_the_real_polish_step(tmp_path):
     assert book.should_polish(book.args) is True
     assert epub.testzip() is None and not Path(book.BOOK_PATH, book.book_id + ".epub.polishing").exists()
     assert not [m for m in book.display.of("error") if "polish" in m.lower()]
+
+
+# ---------------------------------------------------------------- identifiers as Calibre reads them
+@pytest.mark.skipif(shutil.which("ebook-meta") is None, reason="Calibre's ebook-meta is not installed")
+@pytest.mark.parametrize("bare_number_only", [True, False])
+def test_calibre_reports_the_isbn_of_a_book_whose_opf_only_had_a_bare_number(tmp_path, bare_number_only):
+    # A bare <dc:identifier>9781718500570</dc:identifier> is no ISBN to Calibre (verified against 7.6:
+    # "NO Identifiers LINE"); the patch adds the urn:isbn: form, which Calibre reports as isbn:...
+    import subprocess
+
+    identifiers = '<dc:identifier id="pub-id">9781718500570</dc:identifier>'
+    if not bare_number_only:
+        identifiers += '<dc:identifier id="isbn-id">urn:isbn:9781718500570</dc:identifier>'
+
+    package = SafariBooks.patch_opf_document(
+        ('<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">'
+         '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">%s<dc:title>Probe</dc:title>'
+         '<dc:language>en</dc:language><dc:creator>A</dc:creator></metadata><manifest>'
+         '<item id="c" href="c.xhtml" media-type="application/xhtml+xml"/>'
+         '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/></manifest>'
+         '<spine toc="ncx"><itemref idref="c"/></spine></package>' % identifiers).encode(),
+        "content.opf", _oebps(tmp_path), book_info={"isbn": "9781718500570"})
+    path = tmp_path / "probe.epub"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("mimetype", "application/epub+zip", compress_type=zipfile.ZIP_STORED)
+        z.writestr("META-INF/container.xml",
+                   '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+                   '<rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>'
+                   '</rootfiles></container>')
+        z.writestr("OEBPS/content.opf", package)
+        for name, body in (("c.xhtml", '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body><p>x</p></body></html>'),
+                           ("toc.ncx", '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head/><docTitle><text>T</text></docTitle>'
+                                       '<navMap><navPoint id="n" playOrder="1"><navLabel><text>c</text></navLabel><content src="c.xhtml"/></navPoint></navMap></ncx>')):
+            z.writestr("OEBPS/" + name, body)
+
+    out = subprocess.run(["ebook-meta", str(path)], capture_output=True, text=True).stdout
+
+    assert "isbn:9781718500570" in out, out
+
+
+def _oebps(tmp_path):
+    root = tmp_path / "OEBPS"
+    for name in ("c.xhtml", "toc.ncx"):
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_bytes(b"x")
+    return str(root)

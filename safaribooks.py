@@ -1997,6 +1997,19 @@ class SafariBooks:
         if issued and not has_text("date"):
             add_after_title("date", issued)
 
+        # Calibre (and most library software) reads an ISBN only from a "urn:isbn:" value or an
+        # opf:scheme="ISBN" attribute. A bare number is no identifier at all in an EPUB 3 package, so a book
+        # whose OPF carries just that shows no ISBN. Add the catalogue's ISBN in the readable form.
+        isbn = re.sub(r"[\s-]", "", clean_text("isbn")).upper()
+        if re.fullmatch(r"\d{13}|\d{9}[\dX]", isbn):
+            identifiers = metadata.findall("dc:identifier", ns)
+            if not any((e.text or "").strip().lower().startswith("urn:isbn:")
+                       or (e.get(opf + "scheme") or "").lower() == "isbn" for e in identifiers):
+                added = etree.Element(dc + "identifier")
+                added.text = "urn:isbn:" + isbn
+                anchor = identifiers[-1] if identifiers else None
+                metadata.insert(list(metadata).index(anchor) + 1 if anchor is not None else len(metadata), added)
+
         opf_dir = posixpath.dirname(opf_path)
         spine_ids = {ref.get("idref") for ref in spine.findall("opf:itemref", ns)}
         known = set()

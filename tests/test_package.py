@@ -232,6 +232,98 @@ def test_patch_opf_keeps_the_publishers_date(tmp_path):
     assert text_of(root, "date") == ["2024-04-01T00:00:00Z"]
 
 
+# ---------------------------------------------------------------- ISBN identifier
+ISBN = "9781718500570"
+
+
+def opf_with_identifiers(identifiers, version="3.0"):
+    return ('<?xml version="1.0" encoding="UTF-8"?><package xmlns="%s" version="%s" unique-identifier="pub-id">'
+            '<metadata xmlns:dc="%s" xmlns:opf="%s">%s<dc:title>T</dc:title><dc:language>en</dc:language></metadata>'
+            '<manifest>%s</manifest><spine>%s</spine></package>'
+            % (OPF, version, DC, OPF, identifiers, DEFAULT_MANIFEST, DEFAULT_SPINE)).encode("utf-8")
+
+
+def identifiers_of(root):
+    return [(e.text, e.get("id"), e.get("{%s}scheme" % OPF)) for e in root.findall("opf:metadata/dc:identifier", NS)]
+
+
+def test_patch_opf_adds_a_readable_isbn_when_the_opf_only_has_a_bare_number(tmp_path):
+    # Calibre reports no ISBN for a bare <dc:identifier>9781718500570</dc:identifier>
+    opf = opf_with_identifiers('<dc:identifier id="pub-id">%s</dc:identifier>' % ISBN)
+    root = patch(tmp_path, opf, book_info={"isbn": ISBN})
+
+    assert identifiers_of(root) == [(ISBN, "pub-id", None), ("urn:isbn:" + ISBN, None, None)]
+
+
+def test_patch_opf_keeps_the_unique_identifier_pointing_at_the_original_element(tmp_path):
+    opf = opf_with_identifiers('<dc:identifier id="pub-id">%s</dc:identifier>' % ISBN)
+    root = patch(tmp_path, opf, book_info={"isbn": ISBN})
+    target = next(e for e in root.findall("opf:metadata/dc:identifier", NS) if e.get("id") == root.get("unique-identifier"))
+
+    assert target.text == ISBN
+
+
+def test_patch_opf_adds_no_isbn_when_the_opf_already_has_a_urn_isbn(tmp_path):
+    opf = opf_with_identifiers('<dc:identifier id="pub-id">urn:isbn:%s</dc:identifier>' % ISBN)
+
+    assert identifiers_of(patch(tmp_path, opf, book_info={"isbn": ISBN})) == [("urn:isbn:" + ISBN, "pub-id", None)]
+
+
+def test_patch_opf_adds_no_isbn_when_the_opf_declares_the_isbn_scheme(tmp_path):
+    opf = opf_with_identifiers('<dc:identifier id="pub-id" opf:scheme="ISBN">%s</dc:identifier>' % ISBN, version="2.0")
+
+    assert len(identifiers_of(patch(tmp_path, opf, book_info={"isbn": ISBN}))) == 1
+
+
+def test_patch_opf_adds_no_isbn_when_the_opf_lists_a_urn_isbn_next_to_a_bare_number(tmp_path):
+    # the shape of a real publisher file: bare id plus a urn:isbn one
+    opf = opf_with_identifiers('<dc:identifier id="pub-id">%s</dc:identifier>'
+                               '<dc:identifier id="isbn-id">urn:isbn:%s</dc:identifier>' % (ISBN, ISBN))
+
+    assert len(identifiers_of(patch(tmp_path, opf, book_info={"isbn": ISBN}))) == 2
+
+
+def test_patch_opf_adds_the_isbn_next_to_an_oreilly_urn_identifier(tmp_path):
+    opf = opf_with_identifiers('<dc:identifier id="pub-id">urn:orm:book:9781098128463</dc:identifier>')
+    root = patch(tmp_path, opf, book_info={"isbn": ISBN})
+
+    assert [i[0] for i in identifiers_of(root)] == ["urn:orm:book:9781098128463", "urn:isbn:" + ISBN]
+
+
+def test_patch_opf_compares_an_existing_urn_isbn_case_insensitively(tmp_path):
+    opf = opf_with_identifiers('<dc:identifier id="pub-id">URN:ISBN:%s</dc:identifier>' % ISBN)
+
+    assert len(identifiers_of(patch(tmp_path, opf, book_info={"isbn": ISBN}))) == 1
+
+
+@pytest.mark.parametrize("given, written", [
+    ("978-1-7185-0057-0", "urn:isbn:9781718500570"),       # hyphenated
+    (" 9781718500570 ", "urn:isbn:9781718500570"),         # padded
+    ("155860832x", "urn:isbn:155860832X"),                 # ISBN-10 with a lower-case check digit
+])
+def test_patch_opf_normalises_the_isbn_it_writes(tmp_path, given, written):
+    opf = opf_with_identifiers('<dc:identifier id="pub-id">something-else</dc:identifier>')
+
+    assert identifiers_of(patch(tmp_path, opf, book_info={"isbn": given}))[-1][0] == written
+
+
+@pytest.mark.parametrize("value", [None, "", "  ", "n/a", "not-an-isbn", "12345", "97817185005701", "9781718500ab"])
+def test_patch_opf_adds_no_isbn_for_a_missing_or_malformed_value(tmp_path, value):
+    opf = opf_with_identifiers('<dc:identifier id="pub-id">something-else</dc:identifier>')
+
+    assert len(identifiers_of(patch(tmp_path, opf, book_info={"isbn": value}))) == 1
+
+
+def test_patch_opf_writes_the_isbn_after_the_last_identifier_and_only_once(tmp_path):
+    opf = opf_with_identifiers('<dc:identifier id="pub-id">x</dc:identifier><dc:identifier>y</dc:identifier>')
+    first = patch(tmp_path, opf, book_info={"isbn": ISBN})
+    second = etree.fromstring(SafariBooks.patch_opf_document(
+        etree.tostring(first), "content.opf", on_disk(tmp_path, FILES), now=NOW, book_info={"isbn": ISBN}))
+
+    assert [i[0] for i in identifiers_of(first)] == ["x", "y", "urn:isbn:" + ISBN]
+    assert identifiers_of(second) == identifiers_of(first)
+
+
 @pytest.mark.parametrize("tag, key", [("description", "description"), ("subject", "subjects"), ("date", "issued")])
 def test_patch_opf_adds_nothing_for_missing_or_placeholder_values(tmp_path, tag, key):
     # get_book_info() turns a null API field into the string "n/a"

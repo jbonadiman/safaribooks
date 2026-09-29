@@ -337,3 +337,15 @@ def test_create_epub_exits_with_a_clear_message_when_the_spine_is_incomplete(tmp
         book.create_epub()
 
     assert "Package document: spine item xhtml/ch01.xhtml is missing" in book.display.of("exit")[0]
+
+
+def test_patch_opf_gives_our_files_ids_that_do_not_collide_with_the_publishers(tmp_path):
+    # The publisher already owns the id we would generate for sb_styles/Style_Base.css.
+    opf = opf_xml(manifest=DEFAULT_MANIFEST + '<item id="sb_sb_styles_Style_Base.css" href="styles/other.css" '
+                                              'media-type="text/css"/>', spine=DEFAULT_SPINE)
+    root = patch(tmp_path, opf, paths=FILES + ["styles/other.css", "sb_styles/Style_Base.css"])
+    ids = [i.get("id") for i in root.findall("opf:manifest/opf:item", NS)]
+
+    assert len(ids) == len(set(ids)), ids
+    base = [i for i in root.findall("opf:manifest/opf:item", NS) if i.get("href") == "sb_styles/Style_Base.css"]
+    assert len(base) == 1 and base[0].get("id") != "sb_sb_styles_Style_Base.css"

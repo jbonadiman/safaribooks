@@ -45,18 +45,16 @@ Do not send requests with an old browser `User-Agent`: O'Reilly invalidates the 
   * [Example: Use or not the `--kindle` option](#use-or-not-the---kindle-option)
 
 ## Requirements & Setup:
-First of all, it requires `python3` and `pip3` or `pipenv` to be installed.  
+First of all, it requires [`uv`](https://docs.astral.sh/uv/) to be installed (it will fetch Python 3.14 by itself).  
 ```shell
-$ git clone https://github.com/lorenzodifuccia/safaribooks.git
+$ git clone https://github.com/jbonadiman/safaribooks.git
 Cloning into 'safaribooks'...
 
 $ cd safaribooks/
-$ pip3 install -r requirements.txt
-
-OR
-
-$ pipenv install && pipenv shell
+$ uv sync
 ```  
+
+Run the program with `uv run python safaribooks.py ...` (or activate `.venv` first).
 
 The program depends of only two **Python _3_** modules:
 ```python3

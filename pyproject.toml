@@ -1,0 +1,10 @@
+[project]
+name = "safaribooks"
+version = "0.1.0"
+description = "Download books from O'Reilly Learning (Safari Books Online) as EPUB"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "lxml>=4.1.1",
+    "requests>=2.20.0",
+]

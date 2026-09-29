@@ -99,12 +99,98 @@ def test_patch_opf_fills_a_missing_creator_and_publisher_from_the_book_info(tmp_
     assert tags.index("creator") == tags.index("title") + 1
 
 
-def test_patch_opf_never_overwrites_a_creator_or_publisher_the_publisher_supplied(tmp_path):
-    opf = opf_xml(metadata="<dc:creator>Original Author</dc:creator><dc:publisher>Original House</dc:publisher>",
-                  manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
-    root = patch(tmp_path, opf, book_info={"authors": [{"name": "Someone Else"}], "publishers": [{"name": "X"}]})
+def test_patch_opf_never_overwrites_a_creator_the_publisher_supplied(tmp_path):
+    opf = opf_xml(metadata="<dc:creator>Original Author</dc:creator>", manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
+    root = patch(tmp_path, opf, book_info={"authors": [{"name": "Someone Else"}]})
 
-    assert text_of(root, "creator") == ["Original Author"] and text_of(root, "publisher") == ["Original House"]
+    assert text_of(root, "creator") == ["Original Author"]
+
+
+def test_patch_opf_prefers_the_search_apis_publisher_over_the_opfs_own_spelling(tmp_path):
+    # The OPF of a No Starch Press book says "No Starch Press Inc."; the catalogue (and the old
+    # generator's output) says "No Starch Press". The catalogue name is the one readers showed.
+    opf = opf_xml(metadata="<dc:publisher>No Starch Press Inc.</dc:publisher>",
+                  manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
+    root = patch(tmp_path, opf, book_info={"publishers": [{"name": "No Starch Press"}]})
+
+    assert text_of(root, "publisher") == ["No Starch Press"]
+
+
+def test_patch_opf_replaces_every_publisher_element_with_the_single_catalogue_value(tmp_path):
+    opf = opf_xml(metadata="<dc:publisher>A</dc:publisher><dc:publisher>B</dc:publisher>",
+                  manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
+    root = patch(tmp_path, opf, book_info={"publishers": [{"name": "No Starch Press"}]})
+
+    assert text_of(root, "publisher") == ["No Starch Press"]
+
+
+def test_patch_opf_keeps_the_opfs_publisher_when_the_catalogue_has_none(tmp_path):
+    opf = opf_xml(metadata="<dc:publisher>Original House</dc:publisher>",
+                  manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
+
+    for publishers in ([], [{"name": ""}], [{"name": " "}], None):
+        root = patch(tmp_path, opf, book_info={"publishers": publishers})
+        assert text_of(root, "publisher") == ["Original House"]
+
+
+# ---------------------------------------------------------------- description, subjects, date
+def test_patch_opf_adds_the_synopsis_the_opf_lacks(tmp_path):
+    html = "<span><div><p>If you're ready to venture beyond the basics &amp; more</p></div></span>"
+    root = patch(tmp_path, book_info={"description": html})
+
+    assert text_of(root, "description") == [html]
+
+
+def test_patch_opf_keeps_a_synopsis_the_publisher_supplied(tmp_path):
+    opf = opf_xml(metadata="<dc:description>Publisher blurb</dc:description>",
+                  manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
+    root = patch(tmp_path, opf, book_info={"description": "<p>Catalogue blurb</p>"})
+
+    assert text_of(root, "description") == ["Publisher blurb"]
+
+
+def test_patch_opf_adds_subjects_from_the_tags_when_the_opf_has_none(tmp_path):
+    root = patch(tmp_path, book_info={"subjects": [{"name": "Python"}, {"name": "Machine Learning"}, {"name": " "}]})
+
+    assert text_of(root, "subject") == ["Python", "Machine Learning"]
+
+
+def test_patch_opf_keeps_the_publishers_subjects(tmp_path):
+    opf = opf_xml(metadata="<dc:subject>Architecture</dc:subject>", manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
+    root = patch(tmp_path, opf, book_info={"subjects": [{"name": "Python"}]})
+
+    assert text_of(root, "subject") == ["Architecture"]
+
+
+def test_patch_opf_adds_the_release_date_the_opf_lacks(tmp_path):
+    root = patch(tmp_path, book_info={"issued": "2024-04-16"})
+
+    assert text_of(root, "date") == ["2024-04-16"]
+
+
+def test_patch_opf_keeps_the_publishers_date(tmp_path):
+    opf = opf_xml(metadata="<dc:date>2024-04-01T00:00:00Z</dc:date>", manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
+    root = patch(tmp_path, opf, book_info={"issued": "2024-04-16"})
+
+    assert text_of(root, "date") == ["2024-04-01T00:00:00Z"]
+
+
+@pytest.mark.parametrize("tag, key", [("description", "description"), ("subject", "subjects"), ("date", "issued")])
+def test_patch_opf_adds_nothing_for_missing_or_placeholder_values(tmp_path, tag, key):
+    # get_book_info() turns a null API field into the string "n/a"
+    for value in (None, "", "  ", "n/a", [], [{"name": "n/a"}]):
+        root = patch(tmp_path, book_info={key: value})
+        assert text_of(root, tag) == [], (key, value)
+
+
+def test_patch_opf_orders_the_new_elements_after_the_title_group(tmp_path):
+    root = patch(tmp_path, book_info={
+        "authors": [{"name": "Sebastian Raschka"}], "publishers": [{"name": "No Starch Press"}],
+        "description": "<p>x</p>", "subjects": [{"name": "Python"}], "issued": "2024-04-16"})
+
+    tags = [etree.QName(e).localname for e in root.find("opf:metadata", NS)]
+    assert tags[tags.index("title") + 1] == "creator"
+    assert {"publisher", "description", "subject", "date"} <= set(tags)
 
 
 def test_patch_opf_ignores_placeholder_and_blank_names(tmp_path):

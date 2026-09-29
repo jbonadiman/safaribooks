@@ -219,3 +219,28 @@ def test_a_fixed_layout_book_keeps_its_text_colours(tmp_path, load_fixture):
     epub = run(book, serve_all(api, FXL, spec), api)
 
     assert b"#fff" in epub.read("OEBPS/styles/s.css")
+
+
+def test_catalogue_metadata_reaches_the_finished_epub(reflowable):
+    # A No Starch Press OPF says "No Starch Press Inc." and has no synopsis, subjects or date; the
+    # catalogue has all of them, and readers showed those before the /files/ rebuild.
+    book, api, entries = reflowable
+    book.book_info.update({
+        "publishers": [{"name": "No Starch Press"}],
+        "description": "<span><div><p>A synopsis from the catalogue.</p></div></span>",
+        "subjects": [{"name": "Python"}, {"name": "Machine Learning"}],
+        "issued": "2024-04-16",
+    })
+    for i, entry in enumerate(entries):
+        if entry["full_path"] == "content.opf":
+            body = OPF.encode().replace(b"</metadata>", b"<dc:publisher>No Starch Press Inc.</dc:publisher></metadata>")
+            api.serve(entry, body)
+
+    epub = run(book, entries, api)
+    opf = etree.fromstring(epub.read("OEBPS/content.opf"))
+    text = lambda tag: [e.text for e in opf.findall("opf:metadata/dc:" + tag, OPF_NS)]
+
+    assert text("publisher") == ["No Starch Press"]
+    assert text("description") == ["<span><div><p>A synopsis from the catalogue.</p></div></span>"]
+    assert text("subject") == ["Python", "Machine Learning"]
+    assert text("date") == ["2024-04-16"]

@@ -1796,10 +1796,43 @@ class SafariBooks:
                 if name and name != "n/a":
                     add_after_title("creator", name)
 
-        publishers = ", ".join((p.get("name") or "").strip() for p in book_info.get("publishers") or []
-                               if (p.get("name") or "").strip())
-        if publishers and not any((e.text or "").strip() for e in metadata.findall("dc:publisher", ns)):
+        def clean_names(key):
+            """Non-blank names of a {"name": ...} list; get_book_info() turns a null field into "n/a"."""
+            entries = book_info.get(key)
+            names = ((e.get("name") or "").strip() for e in entries if isinstance(e, dict)) \
+                if isinstance(entries, list) else ()
+            return [name for name in names if name and name != "n/a"]
+
+        def clean_text(key):
+            value = book_info.get(key)
+            value = value.strip() if isinstance(value, str) else ""
+            return "" if value == "n/a" else value
+
+        def has_text(tag):
+            return any((e.text or "").strip() for e in metadata.findall("dc:" + tag, ns))
+
+        # The catalogue's name wins over the OPF's own spelling ("No Starch Press Inc." vs "No Starch
+        # Press"): it is what readers showed before, and what the search API lists for the book.
+        publishers = ", ".join(clean_names("publishers"))
+        if publishers:
+            for element in metadata.findall("dc:publisher", ns):
+                metadata.remove(element)
+
             add_after_title("publisher", publishers)
+
+        # The publisher's OPF often carries no synopsis, subjects or release date, and the API does.
+        description = clean_text("description")
+        if description and not has_text("description"):
+            add_after_title("description", description)
+
+        subjects = clean_names("subjects")
+        if subjects and not has_text("subject"):
+            for subject in subjects:
+                add_after_title("subject", subject)
+
+        issued = clean_text("issued")
+        if issued and not has_text("date"):
+            add_after_title("date", issued)
 
         opf_dir = posixpath.dirname(opf_path)
         spine_ids = {ref.get("idref") for ref in spine.findall("opf:itemref", ns)}

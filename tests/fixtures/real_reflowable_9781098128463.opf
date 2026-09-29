@@ -1,0 +1,403 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" xmlns:epub="http://www.idpf.org/2007/ops" xmlns:ibooks="http://apple.com/ibooks/html-extensions" version="3.0" unique-identifier="pub-id" prefix="rendition: http://www.idpf.org/vocab/rendition/#  ibooks: http://vocabulary.itunes.apple.com/rdf/ibooks/vocabulary-extensions-1.0/" xml:lang="en">
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <meta name="cover" content="cover"/>
+    <dc:title id="t1">Machine Learning for Kids</dc:title>
+    <dc:publisher>No Starch Press</dc:publisher>
+    <dc:description>&lt;span&gt;&lt;div&gt;&lt;p&gt;word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word&lt;/p&gt;&lt;p&gt;&lt;i&gt;word word word word&lt;/i&gt;word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word&lt;/p&gt;&lt;p&gt;word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word&lt;/p&gt;&lt;p&gt;•word word word word word word word word word word&lt;br/&gt;•word word word word&lt;br/&gt;•word word word word word word word word word&lt;br/&gt;•word word word word word word word word word word&lt;br/&gt;•word word word word word word word word word word word word&lt;/p&gt;&lt;p&gt;&lt;b&gt;word&lt;/b&gt;&lt;i&gt;word word word word word word word word word word&lt;/i&gt;word word word word word word word word word word word word word word&lt;/p&gt;&lt;/div&gt;&lt;/span&gt;</dc:description>
+    <meta refines="#t1" property="title-type">main</meta>
+    <meta refines="#t1" property="display-seq">1</meta>
+    <meta property="dcterms:publisher">No Starch Press</meta>
+    <meta property="dcterms:modified">2026-09-29T15:46:08Z</meta>
+    <dc:date>2020-12-01</dc:date>
+    <meta property="ibooks:version">3.0</meta>
+    <meta property="ibooks:specified-fonts">true</meta>
+    <dc:language>en</dc:language>
+    <dc:identifier id="pub-id">9781718500570</dc:identifier>
+    <meta refines="#pub-id" property="identifier-type" scheme="xsd:string">uuid</meta>
+    <dc:identifier id="isbn-id">urn:isbn:9781718500570</dc:identifier>
+    <meta refines="#isbn-id" property="identifier-type" scheme="onix:codelist5">15</meta>
+    <dc:creator id="creator">Dale Lane</dc:creator>
+    <meta refines="#creator" property="role" scheme="marc:relators" id="role">aut</meta>
+    <meta refines="#creator" property="file-as">Lane, Dale</meta>
+  </metadata>
+<manifest>
+<!-- Cover & TOC files -->
+<item id="xcover" href="cover.xhtml" media-type="application/xhtml+xml"/>
+<item id="xtoc" href="toc.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+<item id="cover" href="image_fi/book_art/cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+<item id="nsp_logo_black_rk" href="image_fi/book_art/nsp_logo_black_rk.jpg" media-type="image/jpeg"/>
+
+<!-- NCX file -->
+<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+
+<!-- CSS file -->
+<item id="NSTemplate_kids" href="NSTemplate_kids.css" media-type="text/css"/>
+
+<!-- XHTML files -->
+<item id="titlepage" href="titlepage.xhtml" media-type="application/xhtml+xml"/>
+<item id="f01" href="f01.xhtml" media-type="application/xhtml+xml"/>
+<item id="f02" href="f02.xhtml" media-type="application/xhtml+xml"/>
+<item id="f03" href="f03.xhtml" media-type="application/xhtml+xml"/>
+<item id="f04" href="f04.xhtml" media-type="application/xhtml+xml"/>
+<item id="f05" href="f05.xhtml" media-type="application/xhtml+xml"/>
+<item id="c01" href="c01.xhtml" media-type="application/xhtml+xml"/>
+<item id="c02" href="c02.xhtml" media-type="application/xhtml+xml"/>
+<item id="c03" href="c03.xhtml" media-type="application/xhtml+xml"/>
+<item id="c04" href="c04.xhtml" media-type="application/xhtml+xml"/>
+<item id="c05" href="c05.xhtml" media-type="application/xhtml+xml"/>
+<item id="c06" href="c06.xhtml" media-type="application/xhtml+xml"/>
+<item id="c07" href="c07.xhtml" media-type="application/xhtml+xml"/>
+<item id="c08" href="c08.xhtml" media-type="application/xhtml+xml"/>
+<item id="c09" href="c09.xhtml" media-type="application/xhtml+xml"/>
+<item id="c10" href="c10.xhtml" media-type="application/xhtml+xml"/>
+<item id="c11" href="c11.xhtml" media-type="application/xhtml+xml"/>
+<item id="c12" href="c12.xhtml" media-type="application/xhtml+xml"/>
+<item id="c13" href="c13.xhtml" media-type="application/xhtml+xml"/>
+<item id="c14" href="c14.xhtml" media-type="application/xhtml+xml"/>
+<item id="c15" href="c15.xhtml" media-type="application/xhtml+xml"/>
+<item id="c16" href="c16.xhtml" media-type="application/xhtml+xml"/>
+
+
+<!-- Image files -->
+<item id="xf00001" href="image_fi/500563c00/f00001.jpg" media-type="image/jpeg"/>
+<item id="xf00002" href="image_fi/500563c00/f00002.jpg" media-type="image/jpeg"/>
+<item id="xf00003" href="image_fi/500563c00/f00003.jpg" media-type="image/jpeg"/>
+<item id="xf00004" href="image_fi/500563c00/f00004.jpg" media-type="image/jpeg"/>
+<item id="xf01001" href="image_fi/500563c01/f01001.jpg" media-type="image/jpeg"/>
+<item id="xf01002" href="image_fi/500563c01/f01002.jpg" media-type="image/jpeg"/>
+<item id="xf02001" href="image_fi/500563c02/f02001.jpg" media-type="image/jpeg"/>
+<item id="xf02002" href="image_fi/500563c02/f02002.jpg" media-type="image/jpeg"/>
+<item id="xf02003" href="image_fi/500563c02/f02003.jpg" media-type="image/jpeg"/>
+<item id="xf02004" href="image_fi/500563c02/f02004.jpg" media-type="image/jpeg"/>
+<item id="xf02005" href="image_fi/500563c02/f02005.jpg" media-type="image/jpeg"/>
+<item id="xf02006" href="image_fi/500563c02/f02006.jpg" media-type="image/jpeg"/>
+<item id="xf02007" href="image_fi/500563c02/f02007.jpg" media-type="image/jpeg"/>
+<item id="xf02008" href="image_fi/500563c02/f02008.jpg" media-type="image/jpeg"/>
+<item id="xf02009" href="image_fi/500563c02/f02009.jpg" media-type="image/jpeg"/>
+<item id="xf02010" href="image_fi/500563c02/f02010.jpg" media-type="image/jpeg"/>
+<item id="xf02011" href="image_fi/500563c02/f02011.jpg" media-type="image/jpeg"/>
+<item id="xf02012" href="image_fi/500563c02/f02012.jpg" media-type="image/jpeg"/>
+<item id="xf03001" href="image_fi/500563c03/f03001.jpg" media-type="image/jpeg"/>
+<item id="xf03002" href="image_fi/500563c03/f03002.jpg" media-type="image/jpeg"/>
+<item id="xf03003" href="image_fi/500563c03/f03003.jpg" media-type="image/jpeg"/>
+<item id="xf03004" href="image_fi/500563c03/f03004.jpg" media-type="image/jpeg"/>
+<item id="xf03005" href="image_fi/500563c03/f03005.jpg" media-type="image/jpeg"/>
+<item id="xf03006" href="image_fi/500563c03/f03006.jpg" media-type="image/jpeg"/>
+<item id="xf03007" href="image_fi/500563c03/f03007.jpg" media-type="image/jpeg"/>
+<item id="xf03008" href="image_fi/500563c03/f03008.jpg" media-type="image/jpeg"/>
+<item id="xf03009" href="image_fi/500563c03/f03009.jpg" media-type="image/jpeg"/>
+<item id="xf03010" href="image_fi/500563c03/f03010.jpg" media-type="image/jpeg"/>
+<item id="xf03011" href="image_fi/500563c03/f03011.jpg" media-type="image/jpeg"/>
+<item id="xf03012" href="image_fi/500563c03/f03012.jpg" media-type="image/jpeg"/>
+<item id="xf03013" href="image_fi/500563c03/f03013.jpg" media-type="image/jpeg"/>
+<item id="xf03014" href="image_fi/500563c03/f03014.jpg" media-type="image/jpeg"/>
+<item id="xf03015" href="image_fi/500563c03/f03015.jpg" media-type="image/jpeg"/>
+<item id="xf03016" href="image_fi/500563c03/f03016.jpg" media-type="image/jpeg"/>
+<item id="xf03017" href="image_fi/500563c03/f03017.jpg" media-type="image/jpeg"/>
+<item id="xf03018" href="image_fi/500563c03/f03018.jpg" media-type="image/jpeg"/>
+<item id="xf03019" href="image_fi/500563c03/f03019.jpg" media-type="image/jpeg"/>
+<item id="xf03020" href="image_fi/500563c03/f03020.jpg" media-type="image/jpeg"/>
+<item id="xf03021" href="image_fi/500563c03/f03021.jpg" media-type="image/jpeg"/>
+<item id="xf04001" href="image_fi/500563c04/f04001.jpg" media-type="image/jpeg"/>
+<item id="xf04002" href="image_fi/500563c04/f04002.jpg" media-type="image/jpeg"/>
+<item id="xf04003" href="image_fi/500563c04/f04003.jpg" media-type="image/jpeg"/>
+<item id="xf04004" href="image_fi/500563c04/f04004.jpg" media-type="image/jpeg"/>
+<item id="xf04005" href="image_fi/500563c04/f04005.jpg" media-type="image/jpeg"/>
+<item id="xf04006" href="image_fi/500563c04/f04006.jpg" media-type="image/jpeg"/>
+<item id="xf04007" href="image_fi/500563c04/f04007.jpg" media-type="image/jpeg"/>
+<item id="xf04008" href="image_fi/500563c04/f04008.jpg" media-type="image/jpeg"/>
+<item id="xf04009" href="image_fi/500563c04/f04009.jpg" media-type="image/jpeg"/>
+<item id="xf04010" href="image_fi/500563c04/f04010.jpg" media-type="image/jpeg"/>
+<item id="xf04011" href="image_fi/500563c04/f04011.jpg" media-type="image/jpeg"/>
+<item id="xf04012" href="image_fi/500563c04/f04012.jpg" media-type="image/jpeg"/>
+<item id="xf04013" href="image_fi/500563c04/f04013.jpg" media-type="image/jpeg"/>
+<item id="xf04014" href="image_fi/500563c04/f04014.jpg" media-type="image/jpeg"/>
+<item id="xf05001" href="image_fi/500563c05/f05001.jpg" media-type="image/jpeg"/>
+<item id="xf05002" href="image_fi/500563c05/f05002.jpg" media-type="image/jpeg"/>
+<item id="xf05003" href="image_fi/500563c05/f05003.jpg" media-type="image/jpeg"/>
+<item id="xf05004" href="image_fi/500563c05/f05004.jpg" media-type="image/jpeg"/>
+<item id="xf05005" href="image_fi/500563c05/f05005.jpg" media-type="image/jpeg"/>
+<item id="xf05006" href="image_fi/500563c05/f05006.jpg" media-type="image/jpeg"/>
+<item id="xf05007" href="image_fi/500563c05/f05007.jpg" media-type="image/jpeg"/>
+<item id="xf05008" href="image_fi/500563c05/f05008.jpg" media-type="image/jpeg"/>
+<item id="xf05009" href="image_fi/500563c05/f05009.jpg" media-type="image/jpeg"/>
+<item id="xf05010" href="image_fi/500563c05/f05010.jpg" media-type="image/jpeg"/>
+<item id="xf05011" href="image_fi/500563c05/f05011.jpg" media-type="image/jpeg"/>
+<item id="xf05012" href="image_fi/500563c05/f05012.jpg" media-type="image/jpeg"/>
+<item id="xf05013" href="image_fi/500563c05/f05013.jpg" media-type="image/jpeg"/>
+<item id="xf05014" href="image_fi/500563c05/f05014.jpg" media-type="image/jpeg"/>
+<item id="xf05015" href="image_fi/500563c05/f05015.jpg" media-type="image/jpeg"/>
+<item id="xf05016" href="image_fi/500563c05/f05016.jpg" media-type="image/jpeg"/>
+<item id="xf05017" href="image_fi/500563c05/f05017.jpg" media-type="image/jpeg"/>
+<item id="xf05018" href="image_fi/500563c05/f05018.jpg" media-type="image/jpeg"/>
+<item id="xf05019" href="image_fi/500563c05/f05019.jpg" media-type="image/jpeg"/>
+<item id="xf05020" href="image_fi/500563c05/f05020.jpg" media-type="image/jpeg"/>
+<item id="xf05021" href="image_fi/500563c05/f05021.jpg" media-type="image/jpeg"/>
+<item id="xf05022" href="image_fi/500563c05/f05022.jpg" media-type="image/jpeg"/>
+<item id="xf05023" href="image_fi/500563c05/f05023.jpg" media-type="image/jpeg"/>
+<item id="xf06001" href="image_fi/500563c06/f06001.jpg" media-type="image/jpeg"/>
+<item id="xf06002" href="image_fi/500563c06/f06002.jpg" media-type="image/jpeg"/>
+<item id="xf06003" href="image_fi/500563c06/f06003.jpg" media-type="image/jpeg"/>
+<item id="xf06004" href="image_fi/500563c06/f06004.jpg" media-type="image/jpeg"/>
+<item id="xf06005" href="image_fi/500563c06/f06005.jpg" media-type="image/jpeg"/>
+<item id="xf06006" href="image_fi/500563c06/f06006.jpg" media-type="image/jpeg"/>
+<item id="xf06007" href="image_fi/500563c06/f06007.jpg" media-type="image/jpeg"/>
+<item id="xf06008" href="image_fi/500563c06/f06008.jpg" media-type="image/jpeg"/>
+<item id="xf06009" href="image_fi/500563c06/f06009.jpg" media-type="image/jpeg"/>
+<item id="xf06010" href="image_fi/500563c06/f06010.jpg" media-type="image/jpeg"/>
+<item id="xf06011" href="image_fi/500563c06/f06011.jpg" media-type="image/jpeg"/>
+<item id="xf06012" href="image_fi/500563c06/f06012.jpg" media-type="image/jpeg"/>
+<item id="xf06013" href="image_fi/500563c06/f06013.jpg" media-type="image/jpeg"/>
+<item id="xf06014" href="image_fi/500563c06/f06014.jpg" media-type="image/jpeg"/>
+<item id="xf06015" href="image_fi/500563c06/f06015.jpg" media-type="image/jpeg"/>
+<item id="xf06016" href="image_fi/500563c06/f06016.jpg" media-type="image/jpeg"/>
+<item id="xf06017" href="image_fi/500563c06/f06017.jpg" media-type="image/jpeg"/>
+<item id="xf06018" href="image_fi/500563c06/f06018.jpg" media-type="image/jpeg"/>
+<item id="xf06019" href="image_fi/500563c06/f06019.jpg" media-type="image/jpeg"/>
+<item id="xf06020" href="image_fi/500563c06/f06020.jpg" media-type="image/jpeg"/>
+<item id="xf06021" href="image_fi/500563c06/f06021.jpg" media-type="image/jpeg"/>
+<item id="xf06022" href="image_fi/500563c06/f06022.jpg" media-type="image/jpeg"/>
+<item id="xf06023" href="image_fi/500563c06/f06023.jpg" media-type="image/jpeg"/>
+<item id="xf06024" href="image_fi/500563c06/f06024.jpg" media-type="image/jpeg"/>
+<item id="xf07001" href="image_fi/500563c07/f07001.jpg" media-type="image/jpeg"/>
+<item id="xf07002" href="image_fi/500563c07/f07002.jpg" media-type="image/jpeg"/>
+<item id="xf07003" href="image_fi/500563c07/f07003.jpg" media-type="image/jpeg"/>
+<item id="xf07004" href="image_fi/500563c07/f07004.jpg" media-type="image/jpeg"/>
+<item id="xf07005" href="image_fi/500563c07/f07005.jpg" media-type="image/jpeg"/>
+<item id="xf07006" href="image_fi/500563c07/f07006.jpg" media-type="image/jpeg"/>
+<item id="xf07007" href="image_fi/500563c07/f07007.jpg" media-type="image/jpeg"/>
+<item id="xf07008" href="image_fi/500563c07/f07008.jpg" media-type="image/jpeg"/>
+<item id="xf07009" href="image_fi/500563c07/f07009.jpg" media-type="image/jpeg"/>
+<item id="xf07010" href="image_fi/500563c07/f07010.jpg" media-type="image/jpeg"/>
+<item id="xf07011" href="image_fi/500563c07/f07011.jpg" media-type="image/jpeg"/>
+<item id="xf07012" href="image_fi/500563c07/f07012.jpg" media-type="image/jpeg"/>
+<item id="xf07013" href="image_fi/500563c07/f07013.jpg" media-type="image/jpeg"/>
+<item id="xf07014" href="image_fi/500563c07/f07014.jpg" media-type="image/jpeg"/>
+<item id="xf07015" href="image_fi/500563c07/f07015.jpg" media-type="image/jpeg"/>
+<item id="xf07016" href="image_fi/500563c07/f07016.jpg" media-type="image/jpeg"/>
+<item id="xf07017" href="image_fi/500563c07/f07017.jpg" media-type="image/jpeg"/>
+<item id="xf07018" href="image_fi/500563c07/f07018.jpg" media-type="image/jpeg"/>
+<item id="xf07019" href="image_fi/500563c07/f07019.jpg" media-type="image/jpeg"/>
+<item id="xf07020" href="image_fi/500563c07/f07020.jpg" media-type="image/jpeg"/>
+<item id="xf07021" href="image_fi/500563c07/f07021.jpg" media-type="image/jpeg"/>
+<item id="xf07022" href="image_fi/500563c07/f07022.jpg" media-type="image/jpeg"/>
+<item id="xf07023" href="image_fi/500563c07/f07023.jpg" media-type="image/jpeg"/>
+<item id="xf08001" href="image_fi/500563c08/f08001.jpg" media-type="image/jpeg"/>
+<item id="xf08002" href="image_fi/500563c08/f08002.jpg" media-type="image/jpeg"/>
+<item id="xf08003" href="image_fi/500563c08/f08003.jpg" media-type="image/jpeg"/>
+<item id="xf08004" href="image_fi/500563c08/f08004.jpg" media-type="image/jpeg"/>
+<item id="xf08005" href="image_fi/500563c08/f08005.jpg" media-type="image/jpeg"/>
+<item id="xf08006" href="image_fi/500563c08/f08006.jpg" media-type="image/jpeg"/>
+<item id="xf08007" href="image_fi/500563c08/f08007.jpg" media-type="image/jpeg"/>
+<item id="xf08008" href="image_fi/500563c08/f08008.jpg" media-type="image/jpeg"/>
+<item id="xf08009" href="image_fi/500563c08/f08009.jpg" media-type="image/jpeg"/>
+<item id="xf08010" href="image_fi/500563c08/f08010.jpg" media-type="image/jpeg"/>
+<item id="xf08011" href="image_fi/500563c08/f08011.jpg" media-type="image/jpeg"/>
+<item id="xf08012" href="image_fi/500563c08/f08012.jpg" media-type="image/jpeg"/>
+<item id="xf08013" href="image_fi/500563c08/f08013.jpg" media-type="image/jpeg"/>
+<item id="xf08014" href="image_fi/500563c08/f08014.jpg" media-type="image/jpeg"/>
+<item id="xf08015" href="image_fi/500563c08/f08015.jpg" media-type="image/jpeg"/>
+<item id="xf08016" href="image_fi/500563c08/f08016.jpg" media-type="image/jpeg"/>
+<item id="xf08017" href="image_fi/500563c08/f08017.jpg" media-type="image/jpeg"/>
+<item id="xf08018" href="image_fi/500563c08/f08018.jpg" media-type="image/jpeg"/>
+<item id="xf08019" href="image_fi/500563c08/f08019.jpg" media-type="image/jpeg"/>
+<item id="xf08020" href="image_fi/500563c08/f08020.jpg" media-type="image/jpeg"/>
+<item id="xf08021" href="image_fi/500563c08/f08021.jpg" media-type="image/jpeg"/>
+<item id="xf08022" href="image_fi/500563c08/f08022.jpg" media-type="image/jpeg"/>
+<item id="xf08023" href="image_fi/500563c08/f08023.jpg" media-type="image/jpeg"/>
+<item id="xf08024" href="image_fi/500563c08/f08024.jpg" media-type="image/jpeg"/>
+<item id="xf08025" href="image_fi/500563c08/f08025.jpg" media-type="image/jpeg"/>
+<item id="xf08026" href="image_fi/500563c08/f08026.jpg" media-type="image/jpeg"/>
+<item id="xf08027" href="image_fi/500563c08/f08027.jpg" media-type="image/jpeg"/>
+<item id="xf08028" href="image_fi/500563c08/f08028.jpg" media-type="image/jpeg"/>
+<item id="xf08029" href="image_fi/500563c08/f08029.jpg" media-type="image/jpeg"/>
+<item id="xf08030" href="image_fi/500563c08/f08030.jpg" media-type="image/jpeg"/>
+<item id="xf08031" href="image_fi/500563c08/f08031.jpg" media-type="image/jpeg"/>
+<item id="xf09001" href="image_fi/500563c09/f09001.jpg" media-type="image/jpeg"/>
+<item id="xf09002" href="image_fi/500563c09/f09002.jpg" media-type="image/jpeg"/>
+<item id="xf09003" href="image_fi/500563c09/f09003.jpg" media-type="image/jpeg"/>
+<item id="xf09004" href="image_fi/500563c09/f09004.jpg" media-type="image/jpeg"/>
+<item id="xf09005" href="image_fi/500563c09/f09005.jpg" media-type="image/jpeg"/>
+<item id="xf09006" href="image_fi/500563c09/f09006.jpg" media-type="image/jpeg"/>
+<item id="xf09007" href="image_fi/500563c09/f09007.jpg" media-type="image/jpeg"/>
+<item id="xf09008" href="image_fi/500563c09/f09008.jpg" media-type="image/jpeg"/>
+<item id="xf09009" href="image_fi/500563c09/f09009.jpg" media-type="image/jpeg"/>
+<item id="xf09010" href="image_fi/500563c09/f09010.jpg" media-type="image/jpeg"/>
+<item id="xf09011" href="image_fi/500563c09/f09011.jpg" media-type="image/jpeg"/>
+<item id="xf09012" href="image_fi/500563c09/f09012.jpg" media-type="image/jpeg"/>
+<item id="xf09013" href="image_fi/500563c09/f09013.jpg" media-type="image/jpeg"/>
+<item id="xf09014" href="image_fi/500563c09/f09014.jpg" media-type="image/jpeg"/>
+<item id="xf09015" href="image_fi/500563c09/f09015.jpg" media-type="image/jpeg"/>
+<item id="xf09016" href="image_fi/500563c09/f09016.jpg" media-type="image/jpeg"/>
+<item id="xf09017" href="image_fi/500563c09/f09017.jpg" media-type="image/jpeg"/>
+<item id="xf09018" href="image_fi/500563c09/f09018.jpg" media-type="image/jpeg"/>
+<item id="xf09019" href="image_fi/500563c09/f09019.jpg" media-type="image/jpeg"/>
+<item id="xf09020" href="image_fi/500563c09/f09020.jpg" media-type="image/jpeg"/>
+<item id="xf09021" href="image_fi/500563c09/f09021.jpg" media-type="image/jpeg"/>
+<item id="xf09022" href="image_fi/500563c09/f09022.jpg" media-type="image/jpeg"/>
+<item id="xf09023" href="image_fi/500563c09/f09023.jpg" media-type="image/jpeg"/>
+<item id="xf09024" href="image_fi/500563c09/f09024.jpg" media-type="image/jpeg"/>
+<item id="xf09025" href="image_fi/500563c09/f09025.jpg" media-type="image/jpeg"/>
+<item id="xf09026" href="image_fi/500563c09/f09026.jpg" media-type="image/jpeg"/>
+<item id="xf09027" href="image_fi/500563c09/f09027.jpg" media-type="image/jpeg"/>
+<item id="xf09028" href="image_fi/500563c09/f09028.jpg" media-type="image/jpeg"/>
+<item id="xf10001" href="image_fi/500563c10/f10001.jpg" media-type="image/jpeg"/>
+<item id="xf10002" href="image_fi/500563c10/f10002.jpg" media-type="image/jpeg"/>
+<item id="xf10003" href="image_fi/500563c10/f10003.jpg" media-type="image/jpeg"/>
+<item id="xf10004" href="image_fi/500563c10/f10004.jpg" media-type="image/jpeg"/>
+<item id="xf10005" href="image_fi/500563c10/f10005.jpg" media-type="image/jpeg"/>
+<item id="xf10006" href="image_fi/500563c10/f10006.jpg" media-type="image/jpeg"/>
+<item id="xf10007" href="image_fi/500563c10/f10007.jpg" media-type="image/jpeg"/>
+<item id="xf10008" href="image_fi/500563c10/f10008.jpg" media-type="image/jpeg"/>
+<item id="xf10009" href="image_fi/500563c10/f10009.jpg" media-type="image/jpeg"/>
+<item id="xf10010" href="image_fi/500563c10/f10010.jpg" media-type="image/jpeg"/>
+<item id="xf10011" href="image_fi/500563c10/f10011.jpg" media-type="image/jpeg"/>
+<item id="xf10012" href="image_fi/500563c10/f10012.jpg" media-type="image/jpeg"/>
+<item id="xf10013" href="image_fi/500563c10/f10013.jpg" media-type="image/jpeg"/>
+<item id="xf10014" href="image_fi/500563c10/f10014.jpg" media-type="image/jpeg"/>
+<item id="xf10015" href="image_fi/500563c10/f10015.jpg" media-type="image/jpeg"/>
+<item id="xf11001" href="image_fi/500563c11/f11001.jpg" media-type="image/jpeg"/>
+<item id="xf11002" href="image_fi/500563c11/f11002.jpg" media-type="image/jpeg"/>
+<item id="xf11003" href="image_fi/500563c11/f11003.jpg" media-type="image/jpeg"/>
+<item id="xf11004" href="image_fi/500563c11/f11004.jpg" media-type="image/jpeg"/>
+<item id="xf11005" href="image_fi/500563c11/f11005.jpg" media-type="image/jpeg"/>
+<item id="xf11006" href="image_fi/500563c11/f11006.jpg" media-type="image/jpeg"/>
+<item id="xf11007" href="image_fi/500563c11/f11007.jpg" media-type="image/jpeg"/>
+<item id="xf11008_new" href="image_fi/500563c11/f11008_new.jpg" media-type="image/jpeg"/>
+<item id="xf11009" href="image_fi/500563c11/f11009.jpg" media-type="image/jpeg"/>
+<item id="xf11010" href="image_fi/500563c11/f11010.jpg" media-type="image/jpeg"/>
+<item id="xf11011" href="image_fi/500563c11/f11011.jpg" media-type="image/jpeg"/>
+<item id="xf11012" href="image_fi/500563c11/f11012.jpg" media-type="image/jpeg"/>
+<item id="xf11013" href="image_fi/500563c11/f11013.jpg" media-type="image/jpeg"/>
+<item id="xf11014_new" href="image_fi/500563c11/f11014_new.jpg" media-type="image/jpeg"/>
+<item id="xf11015" href="image_fi/500563c11/f11015.jpg" media-type="image/jpeg"/>
+<item id="xf11016" href="image_fi/500563c11/f11016.jpg" media-type="image/jpeg"/>
+<item id="xf12001" href="image_fi/500563c12/f12001.jpg" media-type="image/jpeg"/>
+<item id="xf12002" href="image_fi/500563c12/f12002.jpg" media-type="image/jpeg"/>
+<item id="xf12003" href="image_fi/500563c12/f12003.jpg" media-type="image/jpeg"/>
+<item id="xf12004" href="image_fi/500563c12/f12004.jpg" media-type="image/jpeg"/>
+<item id="xf12005" href="image_fi/500563c12/f12005.jpg" media-type="image/jpeg"/>
+<item id="xf12006" href="image_fi/500563c12/f12006.jpg" media-type="image/jpeg"/>
+<item id="xf12007" href="image_fi/500563c12/f12007.jpg" media-type="image/jpeg"/>
+<item id="xf12008" href="image_fi/500563c12/f12008.jpg" media-type="image/jpeg"/>
+<item id="xf12009" href="image_fi/500563c12/f12009.jpg" media-type="image/jpeg"/>
+<item id="xf12010" href="image_fi/500563c12/f12010.jpg" media-type="image/jpeg"/>
+<item id="xf12011" href="image_fi/500563c12/f12011.jpg" media-type="image/jpeg"/>
+<item id="xf12012" href="image_fi/500563c12/f12012.jpg" media-type="image/jpeg"/>
+<item id="xf12013" href="image_fi/500563c12/f12013.jpg" media-type="image/jpeg"/>
+<item id="xf12014" href="image_fi/500563c12/f12014.jpg" media-type="image/jpeg"/>
+<item id="xf12015" href="image_fi/500563c12/f12015.jpg" media-type="image/jpeg"/>
+<item id="xf12016" href="image_fi/500563c12/f12016.jpg" media-type="image/jpeg"/>
+<item id="xf12017" href="image_fi/500563c12/f12017.jpg" media-type="image/jpeg"/>
+<item id="xf12018" href="image_fi/500563c12/f12018.jpg" media-type="image/jpeg"/>
+<item id="xf12019" href="image_fi/500563c12/f12019.jpg" media-type="image/jpeg"/>
+<item id="xf12020" href="image_fi/500563c12/f12020.jpg" media-type="image/jpeg"/>
+<item id="xf12021" href="image_fi/500563c12/f12021.jpg" media-type="image/jpeg"/>
+<item id="xf12022" href="image_fi/500563c12/f12022.jpg" media-type="image/jpeg"/>
+<item id="xf12023" href="image_fi/500563c12/f12023.jpg" media-type="image/jpeg"/>
+<item id="xf12024" href="image_fi/500563c12/f12024.jpg" media-type="image/jpeg"/>
+<item id="xf12025" href="image_fi/500563c12/f12025.jpg" media-type="image/jpeg"/>
+<item id="xf12026" href="image_fi/500563c12/f12026.jpg" media-type="image/jpeg"/>
+<item id="xf13001" href="image_fi/500563c13/f13001.jpg" media-type="image/jpeg"/>
+<item id="xf13002" href="image_fi/500563c13/f13002.jpg" media-type="image/jpeg"/>
+<item id="xf13003" href="image_fi/500563c13/f13003.jpg" media-type="image/jpeg"/>
+<item id="xf13004" href="image_fi/500563c13/f13004.jpg" media-type="image/jpeg"/>
+<item id="xf13005" href="image_fi/500563c13/f13005.jpg" media-type="image/jpeg"/>
+<item id="xf13006" href="image_fi/500563c13/f13006.jpg" media-type="image/jpeg"/>
+<item id="xf13007" href="image_fi/500563c13/f13007.jpg" media-type="image/jpeg"/>
+<item id="xf13008" href="image_fi/500563c13/f13008.jpg" media-type="image/jpeg"/>
+<item id="xf13009" href="image_fi/500563c13/f13009.jpg" media-type="image/jpeg"/>
+<item id="xf13010" href="image_fi/500563c13/f13010.jpg" media-type="image/jpeg"/>
+<item id="xf13011" href="image_fi/500563c13/f13011.jpg" media-type="image/jpeg"/>
+<item id="xf13012" href="image_fi/500563c13/f13012.jpg" media-type="image/jpeg"/>
+<item id="xf13013" href="image_fi/500563c13/f13013.jpg" media-type="image/jpeg"/>
+<item id="xf13014" href="image_fi/500563c13/f13014.jpg" media-type="image/jpeg"/>
+<item id="xf13015" href="image_fi/500563c13/f13015.jpg" media-type="image/jpeg"/>
+<item id="xf13016" href="image_fi/500563c13/f13016.jpg" media-type="image/jpeg"/>
+<item id="xf13017" href="image_fi/500563c13/f13017.jpg" media-type="image/jpeg"/>
+<item id="xf13018" href="image_fi/500563c13/f13018.jpg" media-type="image/jpeg"/>
+<item id="xf13019" href="image_fi/500563c13/f13019.jpg" media-type="image/jpeg"/>
+<item id="xf13020" href="image_fi/500563c13/f13020.jpg" media-type="image/jpeg"/>
+<item id="xf13021" href="image_fi/500563c13/f13021.jpg" media-type="image/jpeg"/>
+<item id="xf13022" href="image_fi/500563c13/f13022.jpg" media-type="image/jpeg"/>
+<item id="xf13023" href="image_fi/500563c13/f13023.jpg" media-type="image/jpeg"/>
+<item id="xf13024" href="image_fi/500563c13/f13024.jpg" media-type="image/jpeg"/>
+<item id="xf13025" href="image_fi/500563c13/f13025.jpg" media-type="image/jpeg"/>
+<item id="xf13026" href="image_fi/500563c13/f13026.jpg" media-type="image/jpeg"/>
+<item id="xf13027" href="image_fi/500563c13/f13027.jpg" media-type="image/jpeg"/>
+<item id="xf14001" href="image_fi/500563c14/f14001.jpg" media-type="image/jpeg"/>
+<item id="xf14002" href="image_fi/500563c14/f14002.jpg" media-type="image/jpeg"/>
+<item id="xf14003" href="image_fi/500563c14/f14003.jpg" media-type="image/jpeg"/>
+<item id="xf14004" href="image_fi/500563c14/f14004.jpg" media-type="image/jpeg"/>
+<item id="xf14005" href="image_fi/500563c14/f14005.jpg" media-type="image/jpeg"/>
+<item id="xf14006" href="image_fi/500563c14/f14006.jpg" media-type="image/jpeg"/>
+<item id="xf14007" href="image_fi/500563c14/f14007.jpg" media-type="image/jpeg"/>
+<item id="xf14008" href="image_fi/500563c14/f14008.jpg" media-type="image/jpeg"/>
+<item id="xf14009" href="image_fi/500563c14/f14009.jpg" media-type="image/jpeg"/>
+<item id="xf14010" href="image_fi/500563c14/f14010.jpg" media-type="image/jpeg"/>
+<item id="xf14011" href="image_fi/500563c14/f14011.jpg" media-type="image/jpeg"/>
+<item id="xf14012" href="image_fi/500563c14/f14012.jpg" media-type="image/jpeg"/>
+<item id="xf14013" href="image_fi/500563c14/f14013.jpg" media-type="image/jpeg"/>
+<item id="xf14014" href="image_fi/500563c14/f14014.jpg" media-type="image/jpeg"/>
+<item id="xf14015" href="image_fi/500563c14/f14015.jpg" media-type="image/jpeg"/>
+<item id="xf14016" href="image_fi/500563c14/f14016.jpg" media-type="image/jpeg"/>
+<item id="xf14017" href="image_fi/500563c14/f14017.jpg" media-type="image/jpeg"/>
+<item id="xf14018" href="image_fi/500563c14/f14018.jpg" media-type="image/jpeg"/>
+<item id="xf15001" href="image_fi/500563c15/f15001.jpg" media-type="image/jpeg"/>
+<item id="xf15002" href="image_fi/500563c15/f15002.jpg" media-type="image/jpeg"/>
+<item id="xf15003" href="image_fi/500563c15/f15003.jpg" media-type="image/jpeg"/>
+<item id="xf15004" href="image_fi/500563c15/f15004.jpg" media-type="image/jpeg"/>
+<item id="xf15005" href="image_fi/500563c15/f15005.jpg" media-type="image/jpeg"/>
+<item id="xf15006" href="image_fi/500563c15/f15006.jpg" media-type="image/jpeg"/>
+<item id="xf15007" href="image_fi/500563c15/f15007.jpg" media-type="image/jpeg"/>
+<item id="xf15008" href="image_fi/500563c15/f15008.jpg" media-type="image/jpeg"/>
+<item id="xf15009" href="image_fi/500563c15/f15009.jpg" media-type="image/jpeg"/>
+<item id="xf15010" href="image_fi/500563c15/f15010.jpg" media-type="image/jpeg"/>
+<item id="xf15011" href="image_fi/500563c15/f15011.jpg" media-type="image/jpeg"/>
+<item id="xf15012" href="image_fi/500563c15/f15012.jpg" media-type="image/jpeg"/>
+<item id="xf15013" href="image_fi/500563c15/f15013.jpg" media-type="image/jpeg"/>
+<item id="xf15014" href="image_fi/500563c15/f15014.jpg" media-type="image/jpeg"/>
+<item id="xAlphabet-A" href="image_fi/book_art/Alphabet-A.jpg" media-type="image/jpeg"/>
+<item id="xAlphabet-F" href="image_fi/book_art/Alphabet-F.jpg" media-type="image/jpeg"/>
+<item id="xAlphabet-I" href="image_fi/book_art/Alphabet-I.jpg" media-type="image/jpeg"/>
+<item id="xAlphabet-U" href="image_fi/book_art/Alphabet-U.jpg" media-type="image/jpeg"/>
+<item id="xAlphabet-W" href="image_fi/book_art/Alphabet-W.jpg" media-type="image/jpeg"/>
+<item id="xchapterart" href="image_fi/book_art/chapterart.jpg" media-type="image/jpeg"/>
+<!-- font -->
+<item id="xNSAnnotations-Mono" href="image_fi/book_art/NSAnnotations-Mono.otf" media-type="application/vnd.ms-opentype"/>
+<item id="sb_sb_styles_Style_Base.css" href="sb_styles/Style_Base.css" media-type="text/css"/></manifest>
+
+<spine toc="ncx">
+<itemref idref="xcover" linear="yes"/>
+<itemref idref="xtoc"/>
+<itemref idref="titlepage"/>
+<itemref idref="f01"/>
+<itemref idref="f02"/>
+<itemref idref="f03"/>
+<itemref idref="f04"/>
+<itemref idref="f05"/>
+<itemref idref="c01"/>
+<itemref idref="c02"/>
+<itemref idref="c03"/>
+<itemref idref="c04"/>
+<itemref idref="c05"/>
+<itemref idref="c06"/>
+<itemref idref="c07"/>
+<itemref idref="c08"/>
+<itemref idref="c09"/>
+<itemref idref="c10"/>
+<itemref idref="c11"/>
+<itemref idref="c12"/>
+<itemref idref="c13"/>
+<itemref idref="c14"/>
+<itemref idref="c15"/>
+<itemref idref="c16"/>
+</spine>
+
+<guide>
+<reference type="cover" title="Cover" href="cover.xhtml"/>
+<reference type="toc" title="Table of Contents" href="toc.xhtml"/>
+<reference type="text" title="Chapter" href="c01.xhtml"/>
+</guide>
+</package>

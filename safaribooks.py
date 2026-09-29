@@ -233,6 +233,14 @@ class WinQueue(list):  # TODO: error while use `process` in Windows: can't pickl
 
 
 
+def configure_console():
+    """Make printing a title with characters outside the console code page (`charmap`) not crash."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 class SafariBooks:
     LOGIN_URL = ORLY_BASE_URL + "/member/auth/login/"
     LOGIN_ENTRY_URL = SAFARI_BASE_URL + "/login/unified/?next=/home/"
@@ -406,26 +414,7 @@ class SafariBooks:
         self.rename_map = {}
         self.chapter_stylesheets = self.plan_stylesheets(self.plan)
 
-        self.display.info("Downloading book documents... (%s files)" % len(self.plan["documents"]), state=True)
-        self.collect_documents()
-
-        self.display.info("Downloading book CSSs... (%s files)" % len(self.plan["stylesheet"]), state=True)
-        self.collect_css()
-
-        self.display.info("Downloading book fonts...", state=True)
-        self.collect_fonts()
-
-        self.display.info("Downloading book images...", state=True)
-        self.collect_images()
-
-        if not args.no_optimize_images:
-            self.display.info("Optimizing images...", state=True)
-            self.finalize_images()
-
-        self.prepare_fixed_layout()
-
-        self.display.info("Creating EPUB file...", state=True)
-        self.create_epub()
+        self.download_and_build()
 
         if not args.no_cookies:
             json.dump(self.session.cookies.get_dict(), open(COOKIES_FILE, "w"))
@@ -972,7 +961,7 @@ class SafariBooks:
                 namespaces={"x": xhtml[1:-1]}):
             element.getparent().remove(element)
 
-        return etree.tostring(root, xml_declaration=True, encoding="unicode")
+        return etree.tostring(root.getroottree(), xml_declaration=True, encoding="utf-8").decode("utf-8")
 
     # ------------------------------------------------------------------ chapters
     def chapter_title(self, content, full_path):
@@ -1908,6 +1897,29 @@ class SafariBooks:
         os.replace(tmp_path, epub_path)
 
 
+    def download_and_build(self):
+        """Everything between "the plan is known" and "the EPUB is on disk"."""
+        self.display.info("Downloading book documents... (%s files)" % len(self.plan["documents"]), state=True)
+        self.collect_documents()
+
+        self.display.info("Downloading book CSSs... (%s files)" % len(self.plan["stylesheet"]), state=True)
+        self.collect_css()
+
+        self.display.info("Downloading book fonts...", state=True)
+        self.collect_fonts()
+
+        self.display.info("Downloading book images...", state=True)
+        self.collect_images()
+
+        if not self.args.no_optimize_images:
+            self.display.info("Optimizing images...", state=True)
+            self.finalize_images()
+
+        self.prepare_fixed_layout()
+
+        self.display.info("Creating EPUB file...", state=True)
+        self.create_epub()
+
     def create_epub(self):
         open(os.path.join(self.BOOK_PATH, "mimetype"), "w").write("application/epub+zip")
         meta_info = os.path.join(self.BOOK_PATH, "META-INF")
@@ -1975,6 +1987,7 @@ class SafariBooks:
 
 
 if __name__ == "__main__":
+    configure_console()
     arguments = argparse.ArgumentParser(prog="safaribooks.py",
                                         description="Download and generate an EPUB of your favorite books"
                                                     " from Safari Books Online.",

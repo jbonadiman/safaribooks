@@ -168,12 +168,42 @@ def test_patch_opf_adds_the_synopsis_the_opf_lacks(tmp_path):
     assert text_of(root, "description") == [html]
 
 
-def test_patch_opf_keeps_a_synopsis_the_publisher_supplied(tmp_path):
+def test_patch_opf_prefers_the_catalogue_synopsis_because_it_keeps_the_html_lists(tmp_path):
+    # The OPF's description is the same text flattened to "•item" lines; the catalogue's is HTML.
+    flat = "You'll learn:\u2022The rules of probability\u2022The use of statistics"
+    html = "<p>You'll learn:</p><ul><li>The rules of probability</li><li>The use of statistics</li></ul>"
+    opf = opf_xml(metadata="<dc:description>%s</dc:description>" % flat, manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
+    root = patch(tmp_path, opf, book_info={"description": html})
+
+    assert text_of(root, "description") == [html]
+
+
+def test_patch_opf_replaces_every_description_element_with_the_single_catalogue_value(tmp_path):
+    opf = opf_xml(metadata="<dc:description>A</dc:description><dc:description>B</dc:description>",
+                  manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
+    root = patch(tmp_path, opf, book_info={"description": "<p>Catalogue</p>"})
+
+    assert text_of(root, "description") == ["<p>Catalogue</p>"]
+
+
+def test_patch_opf_keeps_the_opfs_synopsis_when_the_catalogue_has_none(tmp_path):
     opf = opf_xml(metadata="<dc:description>Publisher blurb</dc:description>",
                   manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE)
-    root = patch(tmp_path, opf, book_info={"description": "<p>Catalogue blurb</p>"})
 
-    assert text_of(root, "description") == ["Publisher blurb"]
+    for description in (None, "", "  ", "n/a"):
+        root = patch(tmp_path, opf, book_info={"description": description})
+        assert text_of(root, "description") == ["Publisher blurb"], description
+
+
+def test_the_html_synopsis_survives_serialisation_as_escaped_markup(tmp_path):
+    # The old generator wrote escape(description); readers unescape it back into the HTML lists.
+    html = "<ul><li>One &amp; two</li></ul>"
+    raw = SafariBooks.patch_opf_document(
+        opf_xml(manifest=DEFAULT_MANIFEST, spine=DEFAULT_SPINE), "content.opf", on_disk(tmp_path, FILES),
+        now=NOW, book_info={"description": html})
+
+    assert b"&lt;ul&gt;&lt;li&gt;One &amp;amp; two&lt;/li&gt;&lt;/ul&gt;" in raw
+    assert etree.fromstring(raw).findtext("opf:metadata/dc:description", namespaces=NS) == html
 
 
 def test_patch_opf_adds_subjects_from_the_tags_when_the_opf_has_none(tmp_path):

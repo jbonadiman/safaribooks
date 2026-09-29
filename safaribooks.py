@@ -1821,10 +1821,17 @@ class SafariBooks:
 
             add_after_title("publisher", publishers)
 
-        # The publisher's OPF often carries no synopsis, subjects or release date, and the API does.
+        # The catalogue's synopsis is HTML (real <ul>/<ol> lists, paragraphs); an OPF's own
+        # dc:description is usually that text flattened ("•item" lines). The catalogue wins, as it did
+        # before the /files/ rebuild, and the OPF's stays when the catalogue has none.
         description = clean_text("description")
-        if description and not has_text("description"):
+        if description:
+            for element in metadata.findall("dc:description", ns):
+                metadata.remove(element)
+
             add_after_title("description", description)
+
+        # The publisher's OPF often carries no subjects or release date, and the API does.
 
         subjects = clean_names("subjects")
         if subjects and not has_text("subject"):

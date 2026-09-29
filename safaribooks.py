@@ -603,6 +603,7 @@ class SafariBooks:
         desc = response.get("descriptions", {})
         result = {
             "title": response.get("title", ""),
+            "language": response.get("language", ""),
             "authors": [],
             "identifier": response.get("identifier", ""),
             "isbn": response.get("isbn", ""),

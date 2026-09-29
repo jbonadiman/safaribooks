@@ -15,3 +15,8 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "calibre: needs Calibre's ebook-polish on PATH (skipped where it is not installed; run by the calibre CI job)",
+]

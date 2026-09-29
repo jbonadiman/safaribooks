@@ -17,3 +17,21 @@ jobs:
         run: uv sync --locked
       - name: Offline test suite (no network, no cookies)
         run: uv run pytest tests -q -W error::FutureWarning
+
+  calibre:
+    # The offline suite stubs ebook-polish; this job runs the real one on an EPUB the pipeline built.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install Calibre
+        run: |
+          sudo -S -p '' apt-get update
+          sudo -S -p '' apt-get install -y --no-install-recommends calibre
+          ebook-polish --version
+      - name: Install (Python from .python-version, locked deps)
+        run: uv sync --locked
+      - name: Real ebook-polish tests (must run, not skip)
+        run: |
+          uv run pytest tests/test_calibre.py -v -rs -W error::FutureWarning | tee calibre.log
+          ! grep -qi "skipped" calibre.log

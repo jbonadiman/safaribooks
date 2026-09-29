@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # coding: utf-8
+import copy
 import re
 import os
 import time
@@ -1676,6 +1677,160 @@ class SafariBooks:
         return True
 
 
+    BULLET_CHARS = "\u2022\u25cf\u25aa\u25e6\u2023\u2219"
+    BULLET_LINE = re.compile(r"^\s*[%s]\s*" % BULLET_CHARS)
+    NUMBER_LINE = re.compile(r"^\s*(\d{1,2})[.)]\s+")
+
+    @staticmethod
+    def listify_description(markup):
+        """Turn a synopsis' flat "bullet-prefixed lines" into real <ul>/<ol> lists.
+
+        The catalogue often ships a list as one paragraph: `<p>*A<br/>*B</p>` (`*` a bullet char), or a
+        paragraph per item, which readers show as one run-on line. Lines starting with a bullet become
+        <li> of a <ul>; two or more lines numbered 1., 2., ... become an <ol>. Text around a list stays
+        a paragraph, consecutive lists merge, and markup with no such lines is returned untouched.
+        """
+        bullets, number_line = SafariBooks.BULLET_LINE, SafariBooks.NUMBER_LINE
+        if not markup or not (any(c in markup for c in SafariBooks.BULLET_CHARS)
+                              or re.search(r"(^|>|\s)1[.)]\s", markup)):
+            return markup
+
+        try:
+            root = html.fragment_fromstring(markup, create_parent="div")
+        except (etree.ParserError, etree.XMLSyntaxError, ValueError):
+            return markup
+
+        def lines_of(paragraph):
+            """The paragraph split at <br>: each line a list of strings and (tail-less) elements."""
+            lines = [[]]
+            if paragraph.text:
+                lines[-1].append(paragraph.text)
+
+            for child in paragraph:
+                tail, child.tail = child.tail, None
+                if child.tag == "br":
+                    lines.append([])
+                else:
+                    lines[-1].append(child)
+
+                if tail:
+                    lines[-1].append(tail)
+
+            return [line for line in lines if any((x if isinstance(x, str) else "x").strip() for x in line)]
+
+        def starts_with(line, pattern):
+            return isinstance(line[0], str) and pattern.match(line[0])
+
+        def kind_of(line):
+            if starts_with(line, bullets):
+                return "ul"
+
+            number = starts_with(line, number_line)
+            return "ol" if number else "p"
+
+        def strip_marker(line, pattern):
+            line[0] = pattern.sub("", line[0], count=1)
+            return line
+
+        def fill(container, line):
+            container.text = None
+            for part in line:
+                if isinstance(part, str):
+                    if len(container):
+                        container[-1].tail = (container[-1].tail or "") + part
+                    else:
+                        container.text = (container.text or "") + part
+                else:
+                    container.append(part)
+
+            if len(container):
+                container[-1].tail = (container[-1].tail or "").rstrip() or None
+            elif container.text:
+                container.text = container.text.rstrip()
+
+        def numbered_runs_are_lists(lines):
+            """A numbered run only counts when it is 2+ lines counting 1, 2, 3..."""
+            numbers = [int(number_line.match(line[0]).group(1)) for line in lines]
+            return len(numbers) >= 2 and numbers == list(range(1, len(numbers) + 1))
+
+        changed = False
+        for paragraph in list(root.iter("p")):
+            parent = paragraph.getparent()
+            # split a copy: lines_of() detaches tails, and a paragraph with no list must stay intact
+            lines = lines_of(copy.deepcopy(paragraph))
+            kinds = [kind_of(line) for line in lines]
+            if not lines or set(kinds) == {"p"}:
+                continue
+
+            # group consecutive lines of the same kind
+            runs = []
+            for line, kind in zip(lines, kinds):
+                if runs and runs[-1][0] == kind:
+                    runs[-1][1].append(line)
+                else:
+                    runs.append((kind, [line]))
+
+            replacement = []
+            for kind, run in runs:
+                if kind == "ol" and not numbered_runs_are_lists(run):
+                    kind = "p"
+
+                if kind == "p":
+                    block = etree.Element("p")
+                    for index, line in enumerate(run):
+                        if index:
+                            etree.SubElement(block, "br")
+
+                        for part in line:
+                            if isinstance(part, str):
+                                if len(block):
+                                    block[-1].tail = (block[-1].tail or "") + part
+                                else:
+                                    block.text = (block.text or "") + part
+                            else:
+                                block.append(part)
+
+                    replacement.append(block)
+                    continue
+
+                pattern = bullets if kind == "ul" else number_line
+                block = etree.Element(kind)
+                for line in run:
+                    item = etree.SubElement(block, "li")
+                    fill(item, strip_marker(line, pattern))
+
+                replacement.append(block)
+
+            if all(e.tag == "p" for e in replacement):
+                continue
+
+            changed = True
+            tail, position = paragraph.tail, parent.index(paragraph)
+            parent.remove(paragraph)
+            for offset, element in enumerate(replacement):
+                parent.insert(position + offset, element)
+
+            replacement[-1].tail = tail
+
+        # a paragraph per bullet leaves one <ul> each; fold neighbours into one list
+        for parent in root.iter():
+            index = 0
+            while index < len(parent) - 1:
+                current, following = parent[index], parent[index + 1]
+                if current.tag in ("ul", "ol") and following.tag == current.tag and not (current.tail or "").strip():
+                    current.extend(list(following))
+                    current.tail = following.tail
+                    parent.remove(following)
+                else:
+                    index += 1
+
+        if not changed:
+            return markup
+
+        # XML serialisation keeps <br/> as the API wrote it (html.tostring would turn it into <br>)
+        return (escape(root.text or "", quote=False) if root.text else "") + "".join(
+            etree.tostring(child, encoding="unicode") for child in root)
+
     @staticmethod
     def optional_dc_element(tag, value):
         """`<dc:tag>value</dc:tag>\n`, or nothing when value is blank.
@@ -1824,7 +1979,7 @@ class SafariBooks:
         # The catalogue's synopsis is HTML (real <ul>/<ol> lists, paragraphs); an OPF's own
         # dc:description is usually that text flattened ("•item" lines). The catalogue wins, as it did
         # before the /files/ rebuild, and the OPF's stays when the catalogue has none.
-        description = clean_text("description")
+        description = SafariBooks.listify_description(clean_text("description"))
         if description:
             for element in metadata.findall("dc:description", ns):
                 metadata.remove(element)

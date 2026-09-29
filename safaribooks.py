@@ -2,20 +2,28 @@
 # coding: utf-8
 import re
 import os
+import time
+import codecs
+import zipfile
+import subprocess
+import datetime
+import mimetypes
+import posixpath
+import tinycss2
 import sys
 import json
 import shutil
-import pathlib
-import getpass
 import logging
 import argparse
 import requests
 import traceback
-from html import escape
+from html import escape, unescape
 from random import random
 from lxml import html, etree
-from multiprocessing import Process, Queue, Value
-from urllib.parse import urljoin, urlparse, parse_qs, quote_plus
+from PIL import Image
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from multiprocessing import Value
+from urllib.parse import urljoin, urlparse, urlsplit, parse_qs, quote, quote_plus, unquote
 
 
 PATH = os.path.dirname(os.path.realpath(__file__))
@@ -224,90 +232,119 @@ class WinQueue(list):  # TODO: error while use `process` in Windows: can't pickl
         return self.__len__()
 
 
+
 class SafariBooks:
     LOGIN_URL = ORLY_BASE_URL + "/member/auth/login/"
     LOGIN_ENTRY_URL = SAFARI_BASE_URL + "/login/unified/?next=/home/"
 
-    API_TEMPLATE = SAFARI_BASE_URL + "/api/v1/book/{0}/"
+    API_TEMPLATE = SAFARI_BASE_URL + "/api/v2/epubs/urn:orm:book:{0}/"
 
-    BASE_01_HTML = "<!DOCTYPE html>\n" \
-                   "<html lang=\"en\" xml:lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\"" \
-                   " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" \
-                   " xsi:schemaLocation=\"http://www.w3.org/2002/06/xhtml2/" \
-                   " http://www.w3.org/MarkUp/SCHEMA/xhtml2.xsd\"" \
-                   " xmlns:epub=\"http://www.idpf.org/2007/ops\">\n" \
-                   "<head>\n" \
-                   "{0}\n" \
-                   "<style type=\"text/css\">" \
-                   "body{{margin:1em;background-color:transparent!important;}}" \
-                   "#sbo-rt-content *{{text-indent:0pt!important;}}#sbo-rt-content .bq{{margin-right:1em!important;}}"
+    # Parallel downloads. Akamai's edge flake is independent of request pacing (see
+    # requests_provider), so a few workers do not make it worse.
+    WORKERS = 4
 
-    KINDLE_HTML = "#sbo-rt-content *{{word-wrap:break-word!important;" \
-                  "word-break:break-word!important;}}#sbo-rt-content table,#sbo-rt-content pre" \
-                  "{{overflow-x:unset!important;overflow:unset!important;" \
-                  "overflow-y:unset!important;white-space:pre-wrap!important;}}"
+    # Our own stylesheets (base, kindle, externalized inline styles) live in their own
+    # directory: the publisher's `styles/` may exist next to it, and `Styles` vs `styles`
+    # would collide on case-insensitive file systems.
+    OWN_STYLES_DIR = "sb_styles"
+    OPF_NS = "http://www.idpf.org/2007/opf"
+    DC_NS = "http://purl.org/dc/elements/1.1/"
+    NCX_NS = "http://www.daisy.org/z3986/2005/ncx/"
 
-    BASE_02_HTML = "</style>" \
-                   "</head>\n" \
-                   "<body>{1}</body>\n</html>"
+    IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".bmp", ".tif", ".tiff")
+    OTHER_MEDIA_TYPES = {
+        ".xhtml": "application/xhtml+xml", ".html": "application/xhtml+xml", ".htm": "application/xhtml+xml",
+        ".css": "text/css", ".ncx": "application/x-dtbncx+xml", ".svg": "image/svg+xml",
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif",
+        ".js": "text/javascript", ".xml": "application/xml",
+    }
+
+    BASE_STYLE_CSS = "body{margin:1em;background-color:transparent!important;}" \
+                     "#sbo-rt-content *{text-indent:0pt!important;}#sbo-rt-content .bq{margin-right:1em!important;}" \
+                     "#sbo-rt-content img{height:auto!important;max-width:100%!important;}"
+    # Fixed-layout ("PDF-style") books: every page is a fixed-size canvas holding a page-sized
+    # <img> plus one absolutely positioned <span class="t"> per text line.
+    DEFAULT_PAGE_SIZE = (770, 1017)
+    PAGE_SIZE_RE = re.compile(r"img\s*\{[^}]*?\bwidth:\s*(\d+)px\s*;\s*height:\s*(\d+)px")
+    FIXED_LAYOUT_LINE_XPATH = "//span[contains(concat(' ', normalize-space(@class), ' '), ' t ')]"
+    FIXED_LAYOUT_PAGE_XPATH = "//div[starts-with(@id, 'page') and img]"
+    fixed_layout = False
+    KINDLE_STYLE_CSS = "#sbo-rt-content *{word-wrap:break-word!important;" \
+                       "word-break:break-word!important;}#sbo-rt-content table,#sbo-rt-content pre" \
+                       "{overflow-x:unset!important;overflow:unset!important;" \
+                       "overflow-y:unset!important;white-space:pre-wrap!important;}"
+    # Format: title, nested <ol> markup
+    NAV_XHTML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" \
+                "<!DOCTYPE html>\n" \
+                "<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\"" \
+                " lang=\"en\" xml:lang=\"en\">\n" \
+                "<head><meta charset=\"utf-8\"/><title>{0}</title></head>\n" \
+                "<body><nav epub:type=\"toc\" id=\"toc\"><h1>{0}</h1>\n{1}</nav></body>\n</html>"
+    HEADERS = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Encoding": "gzip, deflate",
+        "Referer": LOGIN_ENTRY_URL,
+        "Upgrade-Insecure-Requests": "1",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/124.0.0.0 Safari/537.36"
+    }
+    COOKIE_FLOAT_MAX_AGE_PATTERN = re.compile(r'(max-age=\d*\.\d*)', re.IGNORECASE)
+    # Akamai's edge WAF intermittently blocks otherwise-valid requests with a 403
+    # "Access Denied" page (Server: AkamaiGHost, body links to errors.edgesuite.net)
+    # completely independent of auth state or request pacing -- confirmed by
+    # replaying the exact same URL with the exact same session dozens of times and
+    # seeing it flip between success and this block at a ~30-45% rate. A real
+    # app-level response (including a genuine auth failure) comes from the actual
+    # backend, fingerprinted by Server: istio-envoy. Retrying only the Akamai
+    # fingerprint means a genuine error still fails fast instead of retrying
+    # something that will never succeed.
+    #
+    # With a per-request flake rate p, one request exhausts its retries with
+    # probability p^(MAX_RETRIES+1), and a whole-book run (hundreds of chapter,
+    # image and CSS requests) dies if any single one does. At p=0.45 over 200
+    # requests, 5 retries still fail ~81% of runs; 10 retries fail ~3%. The
+    # backoff is capped so the worst case stays bounded.
+    AKAMAI_BLOCK_SERVER_MARKER = "akamai"
+    MAX_RETRIES = 10
+    RETRY_BACKOFF_BASE_SECONDS = 1.5
+    RETRY_BACKOFF_MAX_SECONDS = 30
+    DECLARATION_AT_RULES = frozenset(("font-face", "page"))
+    FONT_MEDIA_TYPES = {
+        ".otf": "application/vnd.ms-opentype",
+        ".ttf": "application/x-font-truetype",
+        ".woff": "application/font-woff",
+        ".woff2": "font/woff2",
+    }
+    GENERIC_FONT_FAMILIES = frozenset((
+        "serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-serif", "ui-sans-serif",
+        "ui-monospace", "ui-rounded", "math", "emoji", "fangsong",
+    ))
+    CSS_WIDE_KEYWORDS = frozenset(("inherit", "initial", "unset", "revert", "revert-layer"))
+    MONOSPACE_FONT_HINTS = ("mono", "courier", "consolas", "menlo", "lucida console", "typewriter")
+    SANS_FONT_HINTS = ("sans", "gothic", "arial", "helvetica", "verdana", "tahoma", "calibri", "univers", "futura",
+                       "myriad", "frutiger", "trebuchet", "segoe", "roboto", "open sans", "lato")
+    FIXED_LAYOUT_SCALE = 0.25
+    BAKE_SCALE_RE = re.compile(r"scale\(\s*(?:0?\.25|[\d.]+\s*,\s*0?\.25)\s*\)")
+    BAKE_RULE_RE = re.compile(r"([^{}]+)\{([^{}]*)\}")
+    BAKE_TEXT_SELECTOR_RE = re.compile(r"\.s\d+_\d+|#t[0-9a-z]+_\d+")
+    BAKE_LENGTH_PROPS = ("font-size", "letter-spacing", "word-spacing", "line-height", "margin-top")
+    BAKE_ANISOTROPIC_RE = re.compile(r"scale\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)")
 
     CONTAINER_XML = "<?xml version=\"1.0\"?>" \
                     "<container version=\"1.0\" xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">" \
                     "<rootfiles>" \
-                    "<rootfile full-path=\"OEBPS/content.opf\" media-type=\"application/oebps-package+xml\" />" \
+                    "<rootfile full-path=\"OEBPS/{0}\" media-type=\"application/oebps-package+xml\" />" \
                     "</rootfiles>" \
                     "</container>"
 
-    # Format: ID, Title, Authors, Description, Subjects, Publisher, Rights, Date, CoverId, MANIFEST, SPINE, CoverUrl
-    CONTENT_OPF = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" \
-                  "<package xmlns=\"http://www.idpf.org/2007/opf\" unique-identifier=\"bookid\" version=\"2.0\" >\n" \
-                  "<metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\" " \
-                  " xmlns:opf=\"http://www.idpf.org/2007/opf\">\n" \
-                  "<dc:title>{1}</dc:title>\n" \
-                  "{2}\n" \
-                  "<dc:description>{3}</dc:description>\n" \
-                  "{4}" \
-                  "<dc:publisher>{5}</dc:publisher>\n" \
-                  "<dc:rights>{6}</dc:rights>\n" \
-                  "<dc:language>en-US</dc:language>\n" \
-                  "<dc:date>{7}</dc:date>\n" \
-                  "<dc:identifier id=\"bookid\">{0}</dc:identifier>\n" \
-                  "<meta name=\"cover\" content=\"{8}\"/>\n" \
-                  "</metadata>\n" \
-                  "<manifest>\n" \
-                  "<item id=\"ncx\" href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\" />\n" \
-                  "{9}\n" \
-                  "</manifest>\n" \
-                  "<spine toc=\"ncx\">\n{10}</spine>\n" \
-                  "<guide><reference href=\"{11}\" title=\"Cover\" type=\"cover\" /></guide>\n" \
-                  "</package>"
-
-    # Format: ID, Depth, Title, Author, NAVMAP
-    TOC_NCX = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\" ?>\n" \
-              "<!DOCTYPE ncx PUBLIC \"-//NISO//DTD ncx 2005-1//EN\"" \
-              " \"http://www.daisy.org/z3986/2005/ncx-2005-1.dtd\">\n" \
-              "<ncx xmlns=\"http://www.daisy.org/z3986/2005/ncx/\" version=\"2005-1\">\n" \
-              "<head>\n" \
-              "<meta content=\"ID:ISBN:{0}\" name=\"dtb:uid\"/>\n" \
-              "<meta content=\"{1}\" name=\"dtb:depth\"/>\n" \
-              "<meta content=\"0\" name=\"dtb:totalPageCount\"/>\n" \
-              "<meta content=\"0\" name=\"dtb:maxPageNumber\"/>\n" \
-              "</head>\n" \
-              "<docTitle><text>{2}</text></docTitle>\n" \
-              "<docAuthor><text>{3}</text></docAuthor>\n" \
-              "<navMap>{4}</navMap>\n" \
-              "</ncx>"
-
-    HEADERS = {
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate",
-        "Referer": SAFARI_BASE_URL + "/home/",
-        "Upgrade-Insecure-Requests": "1",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/128.0.0.0 Safari/537.36"
-    }
-
-    COOKIE_FLOAT_MAX_AGE_PATTERN = re.compile(r'(max-age=\d*\.\d*)', re.IGNORECASE)
+    # Format: language, title, head links, body
+    CHAPTER_XHTML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" \
+                    "<!DOCTYPE html>\n" \
+                    "<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\"" \
+                    " xmlns:xlink=\"http://www.w3.org/1999/xlink\" lang=\"{0}\" xml:lang=\"{0}\">\n" \
+                    "<head>\n<meta charset=\"utf-8\"/>\n<title>{1}</title>\n{2}</head>\n" \
+                    "<body>{3}</body>\n</html>"
+    STYLESHEET_LINK = "<link href=\"{0}\" rel=\"stylesheet\" type=\"text/css\" />\n"
 
     def __init__(self, args):
         self.args = args
@@ -341,21 +378,15 @@ class SafariBooks:
         self.book_id = args.bookid
         self.api_url = self.API_TEMPLATE.format(self.book_id)
 
+        self.display.info("Retrieving book files...")
+        self.book_files = self.get_book_files()
+        self.plan = self.plan_files(self.book_files)
+
         self.display.info("Retrieving book info...")
         self.book_info = self.get_book_info()
         self.display.book_info(self.book_info)
 
-        self.display.info("Retrieving book chapters...")
-        self.book_chapters = self.get_book_chapters()
-
-        self.chapters_queue = self.book_chapters[:]
-
-        if len(self.book_chapters) > sys.getrecursionlimit():
-            sys.setrecursionlimit(len(self.book_chapters))
-
         self.book_title = self.book_info["title"]
-        self.base_url = self.book_info["web_url"]
-
         self.clean_book_title = "".join(self.escape_dirname(self.book_title).split(",")[:2]) \
                                 + " ({0})".format(self.book_id)
 
@@ -365,41 +396,33 @@ class SafariBooks:
 
         self.BOOK_PATH = os.path.join(books_dir, self.clean_book_title)
         self.display.set_output_dir(self.BOOK_PATH)
+        self.oebps_path = ""
         self.css_path = ""
-        self.images_path = ""
         self.create_dirs()
 
-        self.chapter_title = ""
-        self.filename = ""
-        self.chapter_stylesheets = []
-        self.css = []
-        self.images = []
+        self.fixed_layout = False
+        self.inline_stylesheets = {}
+        self.font_sources = set()
+        self.rename_map = {}
+        self.chapter_stylesheets = self.plan_stylesheets(self.plan)
 
-        self.display.info("Downloading book contents... (%s chapters)" % len(self.book_chapters), state=True)
-        self.BASE_HTML = self.BASE_01_HTML + (self.KINDLE_HTML if not args.kindle else "") + self.BASE_02_HTML
+        self.display.info("Downloading book documents... (%s files)" % len(self.plan["documents"]), state=True)
+        self.collect_documents()
 
-        self.cover = False
-        self.get()
-        if not self.cover:
-            self.cover = self.get_default_cover() if "cover" in self.book_info else False
-            cover_html = self.parse_html(
-                html.fromstring("<div id=\"sbo-rt-content\"><img src=\"Images/{0}\"></div>".format(self.cover)), True
-            )
-
-            self.book_chapters = [{
-                "filename": "default_cover.xhtml",
-                "title": "Cover"
-            }] + self.book_chapters
-
-            self.filename = self.book_chapters[0]["filename"]
-            self.save_page_html(cover_html)
-
-        self.css_done_queue = Queue(0) if "win" not in sys.platform else WinQueue()
-        self.display.info("Downloading book CSSs... (%s files)" % len(self.css), state=True)
+        self.display.info("Downloading book CSSs... (%s files)" % len(self.plan["stylesheet"]), state=True)
         self.collect_css()
-        self.images_done_queue = Queue(0) if "win" not in sys.platform else WinQueue()
-        self.display.info("Downloading book images... (%s files)" % len(self.images), state=True)
+
+        self.display.info("Downloading book fonts...", state=True)
+        self.collect_fonts()
+
+        self.display.info("Downloading book images...", state=True)
         self.collect_images()
+
+        if not args.no_optimize_images:
+            self.display.info("Optimizing images...", state=True)
+            self.finalize_images()
+
+        self.prepare_fixed_layout()
 
         self.display.info("Creating EPUB file...", state=True)
         self.create_epub()
@@ -413,6 +436,7 @@ class SafariBooks:
         if not self.display.in_error and not args.log:
             os.remove(self.display.log_file)
 
+
     def handle_cookie_update(self, set_cookie_headers):
         for morsel in set_cookie_headers:
             # Handle Float 'max-age' Cookie
@@ -420,32 +444,78 @@ class SafariBooks:
                 cookie_key, cookie_value = morsel.split(";")[0].split("=")
                 self.session.cookies.set(cookie_key, cookie_value)
 
+
+    @staticmethod
+    def is_transient_request_exception(exception):
+        # Only errors that can plausibly succeed on a second try. Deterministic
+        # failures (bad URL/scheme, TLS verification, redirect loops) must fail fast.
+        if isinstance(exception, requests.exceptions.SSLError):
+            return False
+
+        return isinstance(exception, (
+            requests.ConnectionError,
+            requests.Timeout,
+            requests.exceptions.ChunkedEncodingError,
+        ))
+
+
+    def sleep_before_retry(self, attempt, reason):
+        backoff = min(
+            self.RETRY_BACKOFF_BASE_SECONDS * (2 ** (attempt - 1)),
+            self.RETRY_BACKOFF_MAX_SECONDS
+        ) + random()
+        self.display.info(
+            "%s, retrying in %.1fs... (attempt %d/%d)" % (reason, backoff, attempt, self.MAX_RETRIES)
+        )
+        time.sleep(backoff)
+
+
     def requests_provider(self, url, is_post=False, data=None, perform_redirect=True, **kwargs):
-        try:
-            response = getattr(self.session, "post" if is_post else "get")(
-                url,
-                data=data,
-                allow_redirects=False,
-                **kwargs
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                response = getattr(self.session, "post" if is_post else "get")(
+                    url,
+                    data=data,
+                    allow_redirects=False,
+                    **kwargs
+                )
+
+                self.handle_cookie_update(response.raw.headers.getlist("Set-Cookie"))
+
+                self.display.last_request = (
+                    url, data, kwargs, response.status_code, "\n".join(
+                        ["\t{}: {}".format(*h) for h in response.headers.items()]
+                    ), response.text
+                )
+
+            except requests.RequestException as request_exception:
+                if self.is_transient_request_exception(request_exception) and attempt <= self.MAX_RETRIES:
+                    self.sleep_before_retry(
+                        attempt, "Network error (%s)" % type(request_exception).__name__
+                    )
+                    continue
+
+                self.display.error(str(request_exception))
+                return 0
+
+            is_akamai_edge_block = (
+                response.status_code == 403 and
+                self.AKAMAI_BLOCK_SERVER_MARKER in (response.headers.get("Server") or "").lower()
             )
+            if is_akamai_edge_block and attempt <= self.MAX_RETRIES:
+                # Release the pooled connection of a discarded (possibly streamed) response
+                response.close()
+                self.sleep_before_retry(attempt, "Blocked by edge WAF (transient): %s" % url)
+                continue
 
-            self.handle_cookie_update(response.raw.headers.getlist("Set-Cookie"))
+            if response.is_redirect and perform_redirect:
+                return self.requests_provider(response.next.url, is_post, None, perform_redirect)
+                # TODO How about **kwargs?
 
-            self.display.last_request = (
-                url, data, kwargs, response.status_code, "\n".join(
-                    ["\t{}: {}".format(*h) for h in response.headers.items()]
-                ), response.text
-            )
+            return response
 
-        except (requests.ConnectionError, requests.ConnectTimeout, requests.RequestException) as request_exception:
-            self.display.error(str(request_exception))
-            return 0
-
-        if response.is_redirect and perform_redirect:
-            return self.requests_provider(response.next.url, is_post, None, perform_redirect)
-            # TODO How about **kwargs?
-
-        return response
 
     @staticmethod
     def parse_cred(cred):
@@ -460,6 +530,7 @@ class SafariBooks:
 
         new_cred[1] = cred[sep + 1:]
         return new_cred
+
 
     def do_login(self, email, password):
         response = self.requests_provider(self.LOGIN_ENTRY_URL)
@@ -515,6 +586,7 @@ class SafariBooks:
         if response == 0:
             self.display.exit("Login: unable to reach Safari Books Online. Try again...")
 
+
     def check_login(self):
         response = self.requests_provider(PROFILE_URL, perform_redirect=False)
 
@@ -529,226 +601,112 @@ class SafariBooks:
 
         self.display.info("Successfully authenticated.", state=True)
 
+
     def get_book_info(self):
         response = self.requests_provider(self.api_url)
         if response == 0:
             self.display.exit("API: unable to retrieve book info.")
 
         response = response.json()
-        if not isinstance(response, dict) or len(response.keys()) == 1:
+        if not isinstance(response, dict) or "title" not in response:
             self.display.exit(self.display.api_error(response))
 
-        if "last_chapter_read" in response:
-            del response["last_chapter_read"]
-
-        for key, value in response.items():
+        desc = response.get("descriptions", {})
+        result = {
+            "title": response.get("title", ""),
+            "authors": [],
+            "identifier": response.get("identifier", ""),
+            "isbn": response.get("isbn", ""),
+            "publishers": [],
+            "rights": "",
+            "description": desc.get("text/html", desc.get("text/plain", "")),
+            "issued": response.get("publication_date", ""),
+            "web_url": SAFARI_BASE_URL + "/library/view/-/{0}/".format(self.book_id),
+            "subjects": [{"name": t} for t in response.get("tags", [])],
+        }
+        result["authors"], result["publishers"] = self.get_book_credits()
+        for key, value in result.items():
             if value is None:
-                response[key] = 'n/a'
+                result[key] = "n/a"
+        return result
 
-        return response
 
-    def get_book_chapters(self, page=1):
-        response = self.requests_provider(urljoin(self.api_url, "chapter/?page=%s" % page))
-        if response == 0:
-            self.display.exit("API: unable to retrieve book chapters.")
+    def get_book_credits(self):
+        """Return (authors, publishers) as lists of {"name": ...} dicts.
 
-        response = response.json()
+        The v2 Epubs endpoint carries neither. The authenticated search API does, so use
+        it first; when it fails or has no exact match for this book, fall back to the
+        public toc.ncx <docAuthor> (author only). Anything unknown stays an empty list.
+        """
+        authors, publishers = [], []
 
-        if not isinstance(response, dict) or len(response.keys()) == 1:
-            self.display.exit(self.display.api_error(response))
+        response = self.requests_provider(
+            urljoin(SAFARI_BASE_URL, "/api/v2/search/?query={0}&limit=5".format(quote_plus(self.book_id)))
+        )
+        if response != 0 and response.status_code == 200:
+            try:
+                results = response.json().get("results", [])
+            except (ValueError, AttributeError):
+                results = []
+            match = next((r for r in results if str(r.get("archive_id", "")) == str(self.book_id)), None)
+            if match:
+                authors = [{"name": n} for n in match.get("authors") or [] if n]
+                publishers = [{"name": n} for n in match.get("publishers") or [] if n]
 
-        if "results" not in response or not len(response["results"]):
-            self.display.exit("API: unable to retrieve book chapters.")
+        if not authors:
+            authors = self.get_ncx_authors()
 
-        if response["count"] > sys.getrecursionlimit():
-            sys.setrecursionlimit(response["count"])
+        if not authors:
+            self.display.warning("Unable to find the book's author(s); the EPUB will have none.")
+        if not publishers:
+            self.display.warning("Unable to find the book's publisher; the EPUB will have none.")
 
-        result = []
-        result.extend([c for c in response["results"] if "cover" in c["filename"] or "cover" in c["title"]])
-        for c in result:
-            del response["results"][response["results"].index(c)]
+        return authors, publishers
 
-        result += response["results"]
-        return result + (self.get_book_chapters(page + 1) if response["next"] else [])
 
-    def get_default_cover(self):
-        response = self.requests_provider(self.book_info["cover"], stream=True)
-        if response == 0:
-            self.display.error("Error trying to retrieve the cover: %s" % self.book_info["cover"])
-            return False
-
-        file_ext = response.headers["Content-Type"].split("/")[-1]
-        with open(os.path.join(self.images_path, "default_cover." + file_ext), 'wb') as i:
-            for chunk in response.iter_content(1024):
-                i.write(chunk)
-
-        return "default_cover." + file_ext
-
-    def get_html(self, url):
-        response = self.requests_provider(url)
+    def get_ncx_authors(self):
+        response = self.requests_provider(urljoin(self.api_url, "files/toc.ncx"))
         if response == 0 or response.status_code != 200:
-            self.display.exit(
-                "Crawler: error trying to retrieve this page: %s (%s)\n    From: %s" %
-                (self.filename, self.chapter_title, url)
-            )
+            return []
 
-        root = None
+        match = re.search(r"<docAuthor>\s*<text>(.*?)</text>\s*</docAuthor>", self.response_text(response), re.S)
+        name = unescape(match.group(1)).strip() if match else ""
+        return [{"name": name}] if name else []
+
+
+    @staticmethod
+    def sanitize_xml_id(raw):
+        xml_id = raw.replace("/", "_")
+        if not xml_id or not (xml_id[0].isalpha() or xml_id[0] == "_"):
+            xml_id = "id_" + xml_id
+
+        return xml_id
+
+
+    @staticmethod
+    def response_text(response):
+        """Decode a response body as UTF-8 unless the server declares a charset.
+
+        `response.text` must not be used for book content: when the
+        Content-Type has no charset, requests falls back to ISO-8859-1 for
+        text/* and turns every multi-byte UTF-8 character into several junk
+        characters (mojibake), which then get re-saved as UTF-8.
+
+        An unknown declared charset falls back to UTF-8, as response.text does
+        for a bogus label, instead of raising LookupError."""
+        declared = "charset" in (response.headers.get("Content-Type") or "").lower()
+        encoding = response.encoding if declared and response.encoding else "utf-8"
         try:
-            root = html.fromstring(response.text, base_url=SAFARI_BASE_URL)
+            codecs.lookup(encoding)
+        except LookupError:
+            encoding = "utf-8"
+        return response.content.decode(encoding, errors="replace")
 
-        except (html.etree.ParseError, html.etree.ParserError) as parsing_error:
-            self.display.error(parsing_error)
-            self.display.exit(
-                "Crawler: error trying to parse this page: %s (%s)\n    From: %s" %
-                (self.filename, self.chapter_title, url)
-            )
-
-        return root
 
     @staticmethod
     def url_is_absolute(url):
         return bool(urlparse(url).netloc)
 
-    @staticmethod
-    def is_image_link(url: str):
-        return pathlib.Path(url).suffix[1:].lower() in ["jpg", "jpeg", "png", "gif"]
-
-    def link_replace(self, link):
-        if link and not link.startswith("mailto"):
-            if not self.url_is_absolute(link):
-                if any(x in link for x in ["cover", "images", "graphics"]) or \
-                        self.is_image_link(link):
-                    image = link.split("/")[-1]
-                    return "Images/" + image
-
-                return link.replace(".html", ".xhtml")
-
-            else:
-                if self.book_id in link:
-                    return self.link_replace(link.split(self.book_id)[-1])
-
-        return link
-
-    @staticmethod
-    def get_cover(html_root):
-        lowercase_ns = etree.FunctionNamespace(None)
-        lowercase_ns["lower-case"] = lambda _, n: n[0].lower() if n and len(n) else ""
-
-        images = html_root.xpath("//img[contains(lower-case(@id), 'cover') or contains(lower-case(@class), 'cover') or"
-                                 "contains(lower-case(@name), 'cover') or contains(lower-case(@src), 'cover') or"
-                                 "contains(lower-case(@alt), 'cover')]")
-        if len(images):
-            return images[0]
-
-        divs = html_root.xpath("//div[contains(lower-case(@id), 'cover') or contains(lower-case(@class), 'cover') or"
-                               "contains(lower-case(@name), 'cover') or contains(lower-case(@src), 'cover')]//img")
-        if len(divs):
-            return divs[0]
-
-        a = html_root.xpath("//a[contains(lower-case(@id), 'cover') or contains(lower-case(@class), 'cover') or"
-                            "contains(lower-case(@name), 'cover') or contains(lower-case(@src), 'cover')]//img")
-        if len(a):
-            return a[0]
-
-        return None
-
-    def parse_html(self, root, first_page=False):
-        if random() > 0.8:
-            if len(root.xpath("//div[@class='controls']/a/text()")):
-                self.display.exit(self.display.api_error(" "))
-
-        book_content = root.xpath("//div[@id='sbo-rt-content']")
-        if not len(book_content):
-            self.display.exit(
-                "Parser: book content's corrupted or not present: %s (%s)" %
-                (self.filename, self.chapter_title)
-            )
-
-        page_css = ""
-        if len(self.chapter_stylesheets):
-            for chapter_css_url in self.chapter_stylesheets:
-                if chapter_css_url not in self.css:
-                    self.css.append(chapter_css_url)
-                    self.display.log("Crawler: found a new CSS at %s" % chapter_css_url)
-
-                page_css += "<link href=\"Styles/Style{0:0>2}.css\" " \
-                            "rel=\"stylesheet\" type=\"text/css\" />\n".format(self.css.index(chapter_css_url))
-
-        stylesheet_links = root.xpath("//link[@rel='stylesheet']")
-        if len(stylesheet_links):
-            for s in stylesheet_links:
-                css_url = urljoin("https:", s.attrib["href"]) if s.attrib["href"][:2] == "//" \
-                    else urljoin(self.base_url, s.attrib["href"])
-
-                if css_url not in self.css:
-                    self.css.append(css_url)
-                    self.display.log("Crawler: found a new CSS at %s" % css_url)
-
-                page_css += "<link href=\"Styles/Style{0:0>2}.css\" " \
-                            "rel=\"stylesheet\" type=\"text/css\" />\n".format(self.css.index(css_url))
-
-        stylesheets = root.xpath("//style")
-        if len(stylesheets):
-            for css in stylesheets:
-                if "data-template" in css.attrib and len(css.attrib["data-template"]):
-                    css.text = css.attrib["data-template"]
-                    del css.attrib["data-template"]
-
-                try:
-                    page_css += html.tostring(css, method="xml", encoding='unicode') + "\n"
-
-                except (html.etree.ParseError, html.etree.ParserError) as parsing_error:
-                    self.display.error(parsing_error)
-                    self.display.exit(
-                        "Parser: error trying to parse one CSS found in this page: %s (%s)" %
-                        (self.filename, self.chapter_title)
-                    )
-
-        # TODO: add all not covered tag for `link_replace` function
-        svg_image_tags = root.xpath("//image")
-        if len(svg_image_tags):
-            for img in svg_image_tags:
-                image_attr_href = [x for x in img.attrib.keys() if "href" in x]
-                if len(image_attr_href):
-                    svg_url = img.attrib.get(image_attr_href[0])
-                    svg_root = img.getparent().getparent()
-                    new_img = svg_root.makeelement("img")
-                    new_img.attrib.update({"src": svg_url})
-                    svg_root.remove(img.getparent())
-                    svg_root.append(new_img)
-
-        book_content = book_content[0]
-        book_content.rewrite_links(self.link_replace)
-
-        xhtml = None
-        try:
-            if first_page:
-                is_cover = self.get_cover(book_content)
-                if is_cover is not None:
-                    page_css = "<style>" \
-                               "body{display:table;position:absolute;margin:0!important;height:100%;width:100%;}" \
-                               "#Cover{display:table-cell;vertical-align:middle;text-align:center;}" \
-                               "img{height:90vh;margin-left:auto;margin-right:auto;}" \
-                               "</style>"
-                    cover_html = html.fromstring("<div id=\"Cover\"></div>")
-                    cover_div = cover_html.xpath("//div")[0]
-                    cover_img = cover_div.makeelement("img")
-                    cover_img.attrib.update({"src": is_cover.attrib["src"]})
-                    cover_div.append(cover_img)
-                    book_content = cover_html
-
-                    self.cover = is_cover.attrib["src"]
-
-            xhtml = html.tostring(book_content, method="xml", encoding='unicode')
-
-        except (html.etree.ParseError, html.etree.ParserError) as parsing_error:
-            self.display.error(parsing_error)
-            self.display.exit(
-                "Parser: error trying to parse HTML of this page: %s (%s)" %
-                (self.filename, self.chapter_title)
-            )
-
-        return page_css, xhtml
 
     @staticmethod
     def escape_dirname(dirname, clean_space=False):
@@ -765,267 +723,1190 @@ class SafariBooks:
 
         return dirname if not clean_space else dirname.replace(" ", "")
 
-    def create_dirs(self):
-        if os.path.isdir(self.BOOK_PATH):
-            self.display.log("Book directory already exists: %s" % self.BOOK_PATH)
 
-        else:
-            os.makedirs(self.BOOK_PATH)
-
-        oebps = os.path.join(self.BOOK_PATH, "OEBPS")
-        if not os.path.isdir(oebps):
-            self.display.book_ad_info = True
-            os.makedirs(oebps)
-
-        self.css_path = os.path.join(oebps, "Styles")
-        if os.path.isdir(self.css_path):
-            self.display.log("CSSs directory already exists: %s" % self.css_path)
-
-        else:
-            os.makedirs(self.css_path)
-            self.display.css_ad_info.value = 1
-
-        self.images_path = os.path.join(oebps, "Images")
-        if os.path.isdir(self.images_path):
-            self.display.log("Images directory already exists: %s" % self.images_path)
-
-        else:
-            os.makedirs(self.images_path)
-            self.display.images_ad_info.value = 1
-
-    def save_page_html(self, contents):
-        self.filename = self.filename.replace(".html", ".xhtml")
-        open(os.path.join(self.BOOK_PATH, "OEBPS", self.filename), "wb") \
-            .write(self.BASE_HTML.format(contents[0], contents[1]).encode("utf-8", 'xmlcharrefreplace'))
-        self.display.log("Created: %s" % self.filename)
-
-    def get(self):
-        len_books = len(self.book_chapters)
-
-        for _ in range(len_books):
-            if not len(self.chapters_queue):
-                return
-
-            first_page = len_books == len(self.chapters_queue)
-
-            next_chapter = self.chapters_queue.pop(0)
-            self.chapter_title = next_chapter["title"]
-            self.filename = next_chapter["filename"]
-
-            asset_base_url = next_chapter['asset_base_url']
-            api_v2_detected = False
-            if 'v2' in next_chapter['content']:
-                asset_base_url = SAFARI_BASE_URL + "/api/v2/epubs/urn:orm:book:{}/files".format(self.book_id)
-                api_v2_detected = True
-
-            if "images" in next_chapter and len(next_chapter["images"]):
-                for img_url in next_chapter['images']:
-                    if api_v2_detected:
-                        self.images.append(asset_base_url + '/' + img_url)
-                    else:
-                        self.images.append(urljoin(next_chapter['asset_base_url'], img_url))
-
-
-            # Stylesheets
-            self.chapter_stylesheets = []
-            if "stylesheets" in next_chapter and len(next_chapter["stylesheets"]):
-                self.chapter_stylesheets.extend(x["url"] for x in next_chapter["stylesheets"])
-
-            if "site_styles" in next_chapter and len(next_chapter["site_styles"]):
-                self.chapter_stylesheets.extend(next_chapter["site_styles"])
-
-            if os.path.isfile(os.path.join(self.BOOK_PATH, "OEBPS", self.filename.replace(".html", ".xhtml"))):
-                if not self.display.book_ad_info and \
-                        next_chapter not in self.book_chapters[:self.book_chapters.index(next_chapter)]:
-                    self.display.info(
-                        ("File `%s` already exists.\n"
-                         "    If you want to download again all the book,\n"
-                         "    please delete the output directory '" + self.BOOK_PATH + "' and restart the program.")
-                         % self.filename.replace(".html", ".xhtml")
-                    )
-                    self.display.book_ad_info = 2
-
-            else:
-                self.save_page_html(self.parse_html(self.get_html(next_chapter["content"]), first_page))
-
-            self.display.state(len_books, len_books - len(self.chapters_queue))
-
-    def _thread_download_css(self, url):
-        css_file = os.path.join(self.css_path, "Style{0:0>2}.css".format(self.css.index(url)))
-        if os.path.isfile(css_file):
-            if not self.display.css_ad_info.value and url not in self.css[:self.css.index(url)]:
-                self.display.info(("File `%s` already exists.\n"
-                                   "    If you want to download again all the CSSs,\n"
-                                   "    please delete the output directory '" + self.BOOK_PATH + "'"
-                                   " and restart the program.") %
-                                  css_file)
-                self.display.css_ad_info.value = 1
-
-        else:
+    # ------------------------------------------------------------------ file listing
+    def get_book_files(self):
+        """Every file of the EPUB as published: /api/v2/epubs/urn:orm:book:<id>/files/ (paginated)."""
+        files = []
+        url = urljoin(self.api_url, "files/?limit=200")
+        while url:
             response = self.requests_provider(url)
             if response == 0:
-                self.display.error("Error trying to retrieve this CSS: %s\n    From: %s" % (css_file, url))
+                self.display.exit("API: unable to retrieve the book's file list.")
 
-            with open(css_file, 'wb') as s:
-                s.write(response.content)
+            try:
+                data = response.json()
+            except ValueError:
+                data = None
 
-        self.css_done_queue.put(1)
-        self.display.state(len(self.css), self.css_done_queue.qsize())
+            if not isinstance(data, dict) or "results" not in data:
+                self.display.exit(self.display.api_error(data if isinstance(data, dict) else {}))
 
+            files.extend(data["results"])
+            url = data.get("next")
 
-    def _thread_download_images(self, url):
-        image_name = url.split("/")[-1]
-        image_path = os.path.join(self.images_path, image_name)
-        if os.path.isfile(image_path):
-            if not self.display.images_ad_info.value and url not in self.images[:self.images.index(url)]:
-                self.display.info(("File `%s` already exists.\n"
-                                   "    If you want to download again all the images,\n"
-                                   "    please delete the output directory '" + self.BOOK_PATH + "'"
-                                   " and restart the program.") %
-                                  image_name)
-                self.display.images_ad_info.value = 1
+        if not files:
+            self.display.exit("API: the book has no files (wrong book id, or no access to it).")
 
-        else:
-            response = self.requests_provider(urljoin(SAFARI_BASE_URL, url), stream=True)
-            if response == 0:
-                self.display.error("Error trying to retrieve this image: %s\n    From: %s" % (image_name, url))
-                return
-
-            with open(image_path, 'wb') as img:
-                for chunk in response.iter_content(1024):
-                    img.write(chunk)
-
-        self.images_done_queue.put(1)
-        self.display.state(len(self.images), self.images_done_queue.qsize())
-
-    def _start_multiprocessing(self, operation, full_queue):
-        if len(full_queue) > 5:
-            for i in range(0, len(full_queue), 5):
-                self._start_multiprocessing(operation, full_queue[i:i + 5])
-
-        else:
-            process_queue = [Process(target=operation, args=(arg,)) for arg in full_queue]
-            for proc in process_queue:
-                proc.start()
-
-            for proc in process_queue:
-                proc.join()
-
-    def collect_css(self):
-        self.display.state_status.value = -1
-
-        # "self._start_multiprocessing" seems to cause problem. Switching to mono-thread download.
-        for css_url in self.css:
-            self._thread_download_css(css_url)
-
-    def collect_images(self):
-        if self.display.book_ad_info == 2:
-            self.display.info("Some of the book contents were already downloaded.\n"
-                              "    If you want to be sure that all the images will be downloaded,\n"
-                              "    please delete the output directory '" + self.BOOK_PATH +
-                              "' and restart the program.")
-
-        self.display.state_status.value = -1
-
-        # "self._start_multiprocessing" seems to cause problem. Switching to mono-thread download.
-        for image_url in self.images:
-            self._thread_download_images(image_url)
-
-    def create_content_opf(self):
-        self.css = next(os.walk(self.css_path))[2]
-        self.images = next(os.walk(self.images_path))[2]
-
-        manifest = []
-        spine = []
-        for c in self.book_chapters:
-            c["filename"] = c["filename"].replace(".html", ".xhtml")
-            item_id = escape("".join(c["filename"].split(".")[:-1]))
-            manifest.append("<item id=\"{0}\" href=\"{1}\" media-type=\"application/xhtml+xml\" />".format(
-                item_id, c["filename"]
-            ))
-            spine.append("<itemref idref=\"{0}\"/>".format(item_id))
-
-        for i in set(self.images):
-            dot_split = i.split(".")
-            head = "img_" + escape("".join(dot_split[:-1]))
-            extension = dot_split[-1]
-            manifest.append("<item id=\"{0}\" href=\"Images/{1}\" media-type=\"image/{2}\" />".format(
-                head, i, "jpeg" if "jp" in extension else extension
-            ))
-
-        for i in range(len(self.css)):
-            manifest.append("<item id=\"style_{0:0>2}\" href=\"Styles/Style{0:0>2}.css\" "
-                            "media-type=\"text/css\" />".format(i))
-
-        authors = "\n".join("<dc:creator opf:file-as=\"{0}\" opf:role=\"aut\">{0}</dc:creator>".format(
-            escape(aut.get("name", "n/d"))
-        ) for aut in self.book_info.get("authors", []))
-
-        subjects = "\n".join("<dc:subject>{0}</dc:subject>".format(escape(sub.get("name", "n/d")))
-                             for sub in self.book_info.get("subjects", []))
-
-        return self.CONTENT_OPF.format(
-            (self.book_info.get("isbn",  self.book_id)),
-            escape(self.book_title),
-            authors,
-            escape(self.book_info.get("description", "")),
-            subjects,
-            ", ".join(escape(pub.get("name", "")) for pub in self.book_info.get("publishers", [])),
-            escape(self.book_info.get("rights", "")),
-            self.book_info.get("issued", ""),
-            self.cover,
-            "\n".join(manifest),
-            "\n".join(spine),
-            self.book_chapters[0]["filename"].replace(".html", ".xhtml")
-        )
+        return files
 
     @staticmethod
-    def parse_toc(l, c=0, mx=0):
-        r = ""
-        for cc in l:
-            c += 1
-            if int(cc["depth"]) > mx:
-                mx = int(cc["depth"])
+    def clean_book_path(full_path):
+        """Normalized POSIX path of a publisher file, or None when it would escape OEBPS/."""
+        if not isinstance(full_path, str) or "\x00" in full_path:
+            return None
 
-            r += "<navPoint id=\"{0}\" playOrder=\"{1}\">" \
-                 "<navLabel><text>{2}</text></navLabel>" \
-                 "<content src=\"{3}\"/>".format(
-                    cc["fragment"] if len(cc["fragment"]) else cc["id"], c,
-                    escape(cc["label"]), cc["href"].replace(".html", ".xhtml").split("/")[-1]
-                 )
+        clean = posixpath.normpath(full_path.replace("\\", "/")).lstrip("/")
+        if clean in ("", ".", "..") or clean.startswith("../"):
+            return None
 
-            if cc["children"]:
-                sr, c, mx = SafariBooks.parse_toc(cc["children"], c, mx)
-                r += sr
+        return clean
 
-            r += "</navPoint>\n"
+    @staticmethod
+    def classify_file(entry):
+        """opf, ncx, chapter, stylesheet, image, font or other, from the API's own metadata."""
+        media = (entry.get("media_type") or "").lower()
+        ext = posixpath.splitext(entry.get("full_path") or "")[1].lower()
+        if media == "application/oebps-package+xml" or ext == ".opf":
+            return "opf"
 
-        return r, c, mx
+        if media == "application/x-dtbncx+xml" or ext == ".ncx":
+            return "ncx"
 
-    def create_toc(self):
-        response = self.requests_provider(urljoin(self.api_url, "toc/"))
-        if response == 0:
-            self.display.exit("API: unable to retrieve book chapters. "
-                              "Don't delete any files, just run again this program"
-                              " in order to complete the `.epub` creation!")
+        if entry.get("kind") == "chapter":
+            return "chapter"
 
-        response = response.json()
+        if media == "text/css" or ext == ".css":
+            return "stylesheet"
 
-        if not isinstance(response, list) and len(response.keys()) == 1:
-            self.display.exit(
-                self.display.api_error(response) +
-                " Don't delete any files, just run again this program"
-                " in order to complete the `.epub` creation!"
-            )
+        if media.startswith("image/") or ext in SafariBooks.IMAGE_EXTENSIONS:
+            return "image"
 
-        navmap, _, max_depth = self.parse_toc(response)
-        return self.TOC_NCX.format(
-            (self.book_info["isbn"] if self.book_info["isbn"] else self.book_id),
-            max_depth,
-            self.book_title,
-            ", ".join(aut.get("name", "") for aut in self.book_info.get("authors", [])),
-            navmap
+        if media.startswith("font/") or "font" in media or ext in SafariBooks.FONT_MEDIA_TYPES:
+            return "font"
+
+        return "other"
+
+    def plan_files(self, files):
+        plan = {"opf": [], "ncx": [], "chapter": [], "stylesheet": [], "image": [], "font": [], "other": []}
+        seen = set()
+        for entry in files:
+            path = self.clean_book_path(entry.get("full_path"))
+            if path is None or not entry.get("url"):
+                self.display.warning("Skipping a file with an unusable path: %r" % entry.get("full_path"))
+                continue
+
+            if path in seen:
+                continue
+
+            seen.add(path)
+            entry = dict(entry, path=path)
+            plan[self.classify_file(entry)].append(entry)
+
+        if not plan["opf"]:
+            self.display.exit("API: the book's file list has no OPF package document.")
+
+        self.opf_path = plan["opf"][0]["path"]
+        self.ncx_path = plan["ncx"][0]["path"] if plan["ncx"] else None
+        if plan["ncx"]:
+            self.ncx_url = plan["ncx"][0]["url"]
+
+        plan["documents"] = plan["opf"] + plan["ncx"] + plan["chapter"] + plan["other"]
+        return plan
+
+    @staticmethod
+    def plan_stylesheets(plan):
+        """Publisher stylesheets, in a stable order. The API does not say which chapter uses which
+        one, so every chapter links all of them (the CSS is scoped under #sbo-rt-content)."""
+        return sorted(e["path"] for e in plan["stylesheet"])
+
+    def destination(self, path):
+        return os.path.join(self.oebps_path, *path.split("/"))
+
+    # ------------------------------------------------------------------ downloads
+    def run_parallel(self, func, items):
+        """Run func(item) for every item on a few threads; func returns an error string or None."""
+        self.display.state_status.value = -1
+        errors = []
+        if not items:
+            return errors
+
+        done = 0
+        with ThreadPoolExecutor(max_workers=self.WORKERS) as executor:
+            futures = {executor.submit(func, item): item for item in items}
+            for future in as_completed(futures):
+                try:
+                    error = future.result()
+                except Exception as exception:  # a failing worker must not kill the others
+                    error = "%s: %s (%s)" % (type(exception).__name__, exception, futures[future]["path"])
+
+                if error:
+                    errors.append(error)
+
+                done += 1
+                self.display.state(len(items), done)
+
+        return errors
+
+    def abort_on_errors(self, errors, what):
+        if errors:
+            for error in errors:
+                self.display.error(error)
+
+            self.display.exit("%d %s failed to download. Nothing already downloaded is lost: wait a few "
+                              "minutes and run the same command again to resume." % (len(errors), what))
+
+    @staticmethod
+    def is_text_file(entry):
+        media = (entry.get("media_type") or "").lower()
+        ext = posixpath.splitext(entry["path"])[1].lower()
+        return (media.startswith("text/") or media.endswith("+xml") or media.endswith("/xml")
+                or ext in (".html", ".xhtml", ".htm", ".xml", ".txt", ".css", ".opf", ".ncx"))
+
+    def save_text(self, path, text):
+        dest = self.destination(path)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        part = dest + ".part"
+        with open(part, "w", encoding="utf-8") as out:
+            out.write(text)
+
+        os.replace(part, dest)
+
+    def fetch_binary(self, entry):
+        dest = self.destination(entry["path"])
+        if os.path.isfile(dest) and os.path.getsize(dest) > 0:
+            return None
+
+        response = self.requests_provider(entry["url"], stream=True)
+        if response == 0 or response.status_code != 200:
+            return "HTTP %s: %s" % ("error" if response == 0 else response.status_code, entry["path"])
+
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        part = dest + ".part"
+        with open(part, "wb") as out:
+            for chunk in response.iter_content(65536):
+                out.write(chunk)
+
+        os.replace(part, dest)
+        return None
+
+    def fetch_document(self, entry):
+        dest = self.destination(entry["path"])
+        kind = self.classify_file(entry)
+        if os.path.isfile(dest) and os.path.getsize(dest) > 0:
+            if kind == "chapter":
+                # Resumed run: parse_chapter() will not run again, so read the fixed-layout marker
+                # from the page already on disk (it was lost on resume before).
+                with open(dest, "rb") as page:
+                    if self.is_fixed_layout_page(html.fromstring(page.read())):
+                        self.fixed_layout = True
+
+            return None
+
+        if not self.is_text_file(entry):
+            return self.fetch_binary(entry)
+
+        response = self.requests_provider(entry["url"])
+        if response == 0 or response.status_code != 200:
+            return "HTTP %s: %s" % ("error" if response == 0 else response.status_code, entry["path"])
+
+        text = self.localize_api_links(self.response_text(response), entry["path"], self.book_id)
+        if kind == "chapter":
+            text = self.parse_chapter(text, entry["path"])
+
+        elif kind == "other" and posixpath.splitext(entry["path"])[1].lower() in (".html", ".xhtml", ".htm"):
+            text = self.strip_injected_document(text)
+
+        self.save_text(entry["path"], text)
+        return None
+
+    def collect_documents(self):
+        self.abort_on_errors(self.run_parallel(self.fetch_document, self.plan["documents"]), "document(s)")
+
+    # ------------------------------------------------------------------ links
+    @staticmethod
+    def localize_api_links(text, full_path, book_id):
+        """Turn the API's absolute asset URLs into paths relative to the file being saved.
+
+        A chapter comes back with `/api/v2/epubs/urn:orm:book:<id>/files/<path>` links; inside the EPUB
+        the same file sits at `<path>` under OEBPS/, so the prefix becomes one `../` per directory level
+        of the referring file. Works for flat books and for books with xhtml/ + styles/ + images/ folders."""
+        pattern = re.compile(r"(?:https?://%s)?/api/v2/epubs/urn:orm:book:%s/files/" % (
+            re.escape(SAFARI_BASE_HOST), re.escape(book_id)))
+        return pattern.sub("../" * posixpath.dirname(full_path).count("/") + (
+            "../" if posixpath.dirname(full_path) else ""), text)
+
+    def book_link(self, link, full_path):
+        """Absolute links into this very book (a library/view URL) become relative, as before."""
+        if link and not link.startswith("mailto") and self.url_is_absolute(link) and self.book_id in link \
+                and urlparse(link).netloc == SAFARI_BASE_HOST:
+            target = link.split(self.book_id)[-1].lstrip("/")
+            depth = posixpath.dirname(full_path).count("/") + (1 if posixpath.dirname(full_path) else 0)
+            return "../" * depth + target
+
+        return link
+
+    @staticmethod
+    def strip_injected(root):
+        """Remove the anti-bot markup Akamai injects into HTML responses (it breaks the EPUB3 nav
+        document): scripts, root-relative <link>s and the security overlay."""
+        for element in root.xpath("//script | //link[starts-with(@href, '/')] | //div[@id='sec-overlay']"):
+            element.getparent().remove(element)
+
+    @staticmethod
+    def strip_injected_document(text):
+        """Same for a whole document. XHTML is edited as XML so namespaces and the doctype survive;
+        anything that does not parse is cleaned with patterns instead."""
+        if "<script" not in text and "sec-overlay" not in text and 'href="/' not in text:
+            return text
+
+        try:
+            root = etree.fromstring(text.encode("utf-8"))
+        except etree.XMLSyntaxError:
+            return re.sub(r"<script\b[^>]*>.*?</script>|<link\b[^>]*\bhref=\"/[^\"]*\"[^>]*>", "", text,
+                          flags=re.S)
+
+        xhtml = "{http://www.w3.org/1999/xhtml}"
+        for element in root.xpath(
+                "//x:script | //x:link[starts-with(@href, '/')] | //x:div[@id='sec-overlay']",
+                namespaces={"x": xhtml[1:-1]}):
+            element.getparent().remove(element)
+
+        return etree.tostring(root, xml_declaration=True, encoding="unicode")
+
+    # ------------------------------------------------------------------ chapters
+    def chapter_title(self, content, full_path):
+        for heading in content.xpath(".//h1 | .//h2 | .//h3"):
+            text = " ".join(heading.text_content().split())
+            if text:
+                return text
+
+        return posixpath.splitext(posixpath.basename(full_path))[0]
+
+    def head_links(self, full_path):
+        """Stylesheet <link>s for a chapter: publisher CSS first, our base CSS last so it wins."""
+        here = posixpath.dirname(full_path) or "."
+        links = [posixpath.relpath(css, here) for css in self.chapter_stylesheets]
+        links += [posixpath.relpath(posixpath.join(self.OWN_STYLES_DIR, name), here)
+                  for name in sorted(self.inline_stylesheets.values())]
+        links.append(posixpath.relpath(posixpath.join(self.OWN_STYLES_DIR, "Style_Base.css"), here))
+        if self.args.kindle:
+            links.append(posixpath.relpath(posixpath.join(self.OWN_STYLES_DIR, "Style_Kindle.css"), here))
+
+        return "".join(self.STYLESHEET_LINK.format(escape(quote(link, safe="/"), quote=True)) for link in links)
+
+    def parse_chapter(self, text, full_path):
+        """A served chapter is an HTML fragment (`<div id="sbo-rt-content">`); return a full XHTML page."""
+        try:
+            root = html.fromstring(text)
+        except (html.etree.ParseError, html.etree.ParserError) as parsing_error:
+            self.display.error(parsing_error)
+            self.display.exit("Parser: error trying to parse this page: %s" % full_path)
+
+        self.strip_injected(root)
+        content = root.xpath("//div[@id='sbo-rt-content']")
+        if content:
+            content = content[0]
+        else:
+            # A whole document without the wrapper: the publisher CSS is scoped under it, so add it.
+            body = root.find(".//body")
+            source = body if body is not None else root
+            content = html.fromstring("<div id=\"sbo-rt-content\"></div>")
+            content.text = source.text
+            for child in list(source):
+                content.append(child)
+
+        # Stylesheets: a relative <link> the publisher kept is honoured (and de-duplicated against
+        # the shared list); everything else was injected or is absolute and is dropped.
+        for link in content.xpath(".//link"):
+            link.getparent().remove(link)
+
+        for style in content.xpath(".//style"):
+            if style.get("data-template"):
+                style.text = style.get("data-template")
+                del style.attrib["data-template"]
+
+            if (style.text or "").strip():
+                self.get_inline_stylesheet_link(style.text)
+
+            style.getparent().remove(style)
+
+        # SVG-wrapped images (covers) become plain <img>: many readers ignore <image xlink:href>.
+        for image in content.xpath(".//image"):
+            image_attr_href = [x for x in image.attrib.keys() if "href" in x]
+            svg = image.getparent()
+            if len(image_attr_href) and svg is not None and svg.getparent() is not None:
+                new_img = svg.makeelement("img")
+                new_img.attrib.update({"src": image.attrib.get(image_attr_href[0])})
+                svg.addprevious(new_img)
+                svg.getparent().remove(svg)
+
+        if self.is_fixed_layout_page(content):
+            self.fixed_layout = True
+
+        self.strip_empty_output_blocks(content)
+        if not self.args.no_optimize_css and not self.is_fixed_layout_page(content):
+            self.strip_inline_style_color(content)
+
+        content.rewrite_links(lambda link: self.book_link(link, full_path))
+        try:
+            body = html.tostring(content, method="xml", encoding="unicode", with_tail=False)
+        except (html.etree.ParseError, html.etree.ParserError) as parsing_error:
+            self.display.error(parsing_error)
+            self.display.exit("Parser: error trying to parse HTML of this page: %s" % full_path)
+
+        language = escape(str(self.book_info.get("language") or "en"), quote=True)
+        return self.CHAPTER_XHTML.format(
+            language, escape(self.chapter_title(content, full_path)), self.head_links(full_path), body
         )
+
+
+    @staticmethod
+    def strip_empty_output_blocks(root):
+        for pre in root.xpath("//pre[@data-type='programlisting'][@class='output']"):
+            text = (pre.text_content() or "").strip()
+            if text in ("", "''"):
+                pre.getparent().remove(pre)
+
+
+    @staticmethod
+    def _is_color_declaration(node):
+        return getattr(node, "type", None) == "declaration" and node.lower_name == "color"
+
+
+    @staticmethod
+    def _is_keepable(node):
+        return getattr(node, "type", None) != "error" and not SafariBooks._is_color_declaration(node)
+
+
+    @staticmethod
+    def _strip_color_from_rules(rules):
+        for rule in rules:
+            rule_type = getattr(rule, "type", None)
+            if rule_type == "qualified-rule":
+                declarations = tinycss2.parse_declaration_list(
+                    rule.content, skip_comments=False, skip_whitespace=False
+                )
+                rule.content = [d for d in declarations if SafariBooks._is_keepable(d)]
+
+            elif rule_type == "at-rule" and rule.content is not None:
+                if rule.lower_at_keyword in SafariBooks.DECLARATION_AT_RULES:
+                    # The body is a declaration list (src, font-family, margin, ...), not nested rules.
+                    # Parsing it as rules turns every declaration into an error node and empties the block.
+                    declarations = tinycss2.parse_declaration_list(
+                        rule.content, skip_comments=False, skip_whitespace=False
+                    )
+                    rule.content = [d for d in declarations if SafariBooks._is_keepable(d)]
+                    continue
+
+                nested = tinycss2.parse_rule_list(rule.content, skip_comments=False, skip_whitespace=False)
+                nested = [r for r in nested if SafariBooks._is_keepable(r)]
+                SafariBooks._strip_color_from_rules(nested)
+                rule.content = nested
+
+
+    @staticmethod
+    def _font_url_nodes(declaration):
+        """Yield (node, url) for every url(...) in a declaration value: a url token or a url("...") function."""
+        for token in declaration.value:
+            if token.type == "url":
+                yield token, token.value
+            elif token.type == "function" and token.lower_name == "url":
+                strings = [a for a in token.arguments if a.type == "string"]
+                if strings:
+                    yield strings[0], strings[0].value
+
+
+    @staticmethod
+    def _font_filename(font_url):
+        name = unquote(os.path.basename(urlparse(font_url).path))
+        if not name or name in (".", "..") or "/" in name or "\\" in name:
+            return ""
+
+        return name
+
+
+    @staticmethod
+    def _font_family_names(value):
+        """Lower-cased identifiers / quoted names of a font-family value."""
+        names = []
+        for token in value:
+            if token.type == "ident":
+                names.append(token.lower_value)
+            elif token.type == "string":
+                names.append(token.value.lower())
+        return names
+
+
+    @staticmethod
+    def _generic_for_font_family(value):
+        names = SafariBooks._font_family_names(value)
+        if any(n in SafariBooks.GENERIC_FONT_FAMILIES or n in SafariBooks.CSS_WIDE_KEYWORDS for n in names):
+            return None
+        joined = " ".join(names)
+        if any(hint in joined for hint in SafariBooks.MONOSPACE_FONT_HINTS):
+            return "monospace"
+        if any(hint in joined for hint in SafariBooks.SANS_FONT_HINTS):
+            return "sans-serif"
+        return "serif"
+
+
+    @staticmethod
+    def _add_generic_to_declaration(declaration):
+        """Add the fallback in place; return True when the declaration changed."""
+        if getattr(declaration, "type", None) != "declaration" or declaration.lower_name != "font-family":
+            return False
+        generic = SafariBooks._generic_for_font_family(declaration.value)
+        if generic is None:
+            return False
+        value = list(declaration.value)
+        while value and value[-1].type in ("whitespace", "comment"):
+            value.pop()
+        if not value:
+            return False
+        value.extend(tinycss2.parse_component_value_list(", " + generic))
+        declaration.value = value
+        return True
+
+
+    @staticmethod
+    def _add_generic_font_family_to_rules(rules):
+        for rule in rules:
+            rule_type = getattr(rule, "type", None)
+            if rule_type == "qualified-rule":
+                declarations = tinycss2.parse_declaration_list(
+                    rule.content, skip_comments=False, skip_whitespace=False
+                )
+                # Reserialize only rules that changed, so untouched CSS keeps its original text.
+                changed = [SafariBooks._add_generic_to_declaration(d) for d in declarations]
+                if any(changed):
+                    rule.content = declarations
+
+            elif (rule_type == "at-rule" and rule.content is not None
+                  and rule.lower_at_keyword not in SafariBooks.DECLARATION_AT_RULES):
+                nested = tinycss2.parse_rule_list(rule.content, skip_comments=False, skip_whitespace=False)
+                SafariBooks._add_generic_font_family_to_rules(nested)
+                if "font-family" in tinycss2.serialize(nested).lower():
+                    rule.content = nested
+
+
+    @staticmethod
+    def add_generic_font_family_to_stylesheet(css_text):
+        """Append a generic family (serif, sans-serif or monospace) to every font-family list that has none.
+
+        The publisher CSS names print fonts that no e-reader has, with no fallback; Calibre's check reports
+        each of these as "Unexpected missing generic font family". The named font stays first, so readers
+        that do have it are unaffected. @font-face descriptors are left alone (a generic is invalid there).
+        """
+        rules = tinycss2.parse_stylesheet(css_text, skip_comments=False, skip_whitespace=False)
+        SafariBooks._add_generic_font_family_to_rules(rules)
+        return tinycss2.serialize(rules)
+
+
+    @staticmethod
+    def add_generic_font_family_to_style_attr(style_value):
+        declarations = tinycss2.parse_declaration_list(style_value, skip_comments=True, skip_whitespace=True)
+        for declaration in declarations:
+            SafariBooks._add_generic_to_declaration(declaration)
+        return tinycss2.serialize(declarations).strip()
+
+
+    @staticmethod
+    def strip_color_from_stylesheet(css_text):
+        rules = tinycss2.parse_stylesheet(css_text, skip_comments=False, skip_whitespace=False)
+        rules = [r for r in rules if SafariBooks._is_keepable(r)]
+        SafariBooks._strip_color_from_rules(rules)
+        return SafariBooks.add_generic_font_family_to_stylesheet(tinycss2.serialize(rules))
+
+
+    @staticmethod
+    def strip_color_from_style_attr(style_value):
+        declarations = tinycss2.parse_declaration_list(style_value, skip_comments=True, skip_whitespace=True)
+        kept = [d for d in declarations if SafariBooks._is_keepable(d)]
+        return tinycss2.serialize(kept).strip()
+
+
+    @staticmethod
+    def strip_inline_style_color(root):
+        for el in root.xpath("//*[@style]"):
+            new_value = SafariBooks.add_generic_font_family_to_style_attr(
+                SafariBooks.strip_color_from_style_attr(el.get("style"))
+            )
+            if new_value:
+                el.set("style", new_value)
+            else:
+                del el.attrib["style"]
+
+
+    def get_inline_stylesheet_link(self, content):
+        if content not in self.inline_stylesheets:
+            filename = "Inline{0:0>2}.css".format(len(self.inline_stylesheets))
+            processed = content if self.args.no_optimize_css else self.strip_color_from_stylesheet(content)
+            os.makedirs(self.css_path, exist_ok=True)
+            open(os.path.join(self.css_path, filename), "w", encoding="utf-8").write(processed)
+            self.inline_stylesheets[content] = filename
+
+        return self.inline_stylesheets[content]
+
+    # ------------------------------------------------------------------ stylesheets and fonts
+    @staticmethod
+    def resolve_local(base_path, value):
+        """OEBPS-relative path a link inside `base_path` points at, or None (external, data:, #anchor...)."""
+        value = (value or "").strip()
+        if not value or value.startswith(("#", "//", "data:", "mailto:", "javascript:")):
+            return None
+
+        parts = urlsplit(value)
+        if parts.scheme or parts.netloc or not parts.path:
+            return None
+
+        target = posixpath.normpath(posixpath.join(posixpath.dirname(base_path), unquote(parts.path)))
+        if target.startswith("../") or target in ("..", ".") or target.startswith("/"):
+            return None
+
+        return target
+
+    @staticmethod
+    def font_face_sources(css_text, css_path):
+        """OEBPS paths of the fonts the stylesheet asks readers to load (@font-face `src: url()` only).
+
+        A `src` inside an ordinary rule is not a font the book loads: the publisher CSS has one pointing
+        at a 23 MB Arial Unicode file that must not be downloaded. `data:` URIs and absolute URLs are skipped."""
+        found = []
+
+        def walk(rules):
+            for rule in rules:
+                if getattr(rule, "type", None) != "at-rule" or rule.content is None:
+                    continue
+
+                if rule.lower_at_keyword == "font-face":
+                    for declaration in tinycss2.parse_declaration_list(
+                            rule.content, skip_comments=True, skip_whitespace=True):
+                        if getattr(declaration, "type", None) == "declaration" and declaration.lower_name == "src":
+                            for _, value in SafariBooks._font_url_nodes(declaration):
+                                path = SafariBooks.resolve_local(css_path, value)
+                                if path:
+                                    found.append(path)
+
+                elif rule.lower_at_keyword not in SafariBooks.DECLARATION_AT_RULES:
+                    walk(tinycss2.parse_rule_list(rule.content, skip_comments=True, skip_whitespace=True))
+
+        walk(tinycss2.parse_stylesheet(css_text, skip_comments=True, skip_whitespace=True))
+        return found
+
+    def fetch_stylesheet(self, entry):
+        dest = self.destination(entry["path"])
+        if os.path.isfile(dest):
+            with open(dest, encoding="utf-8", errors="replace") as css_file:
+                self.font_sources.update(self.font_face_sources(css_file.read(), entry["path"]))
+
+            return None
+
+        response = self.requests_provider(entry["url"])
+        if response == 0 or response.status_code != 200:
+            return "HTTP %s: %s" % ("error" if response == 0 else response.status_code, entry["path"])
+
+        content = self.localize_api_links(response.content.decode("utf-8", errors="replace"),
+                                          entry["path"], self.book_id)
+        self.font_sources.update(self.font_face_sources(content, entry["path"]))
+        # Fixed-layout books keep the publisher CSS as is: stripping colours turns the positioned
+        # white-on-dark text black.
+        if not (self.args.no_optimize_css or self.fixed_layout):
+            content = self.strip_color_from_stylesheet(content)
+
+        self.save_text(entry["path"], content)
+        return None
+
+    def collect_css(self):
+        self.abort_on_errors(self.run_parallel(self.fetch_stylesheet, self.plan["stylesheet"]), "stylesheet(s)")
+
+    def fetch_font(self, entry):
+        error = self.fetch_binary(entry)
+        if error:
+            # The @font-face rule stays; readers fall back to the generic family added after the name.
+            self.display.warning("Could not download font %s; the book will use a fallback for it." % entry["path"])
+
+        return None
+
+    def collect_fonts(self):
+        wanted = [e for e in self.plan["font"] if e["path"] in self.font_sources]
+        skipped = [e["path"] for e in self.plan["font"] if e["path"] not in self.font_sources]
+        if skipped:
+            self.display.log("Fonts not loaded by any @font-face, not downloaded: %s" % ", ".join(skipped))
+
+        known = {e["path"] for e in self.plan["font"]}
+        for missing in sorted(self.font_sources - known):
+            self.display.warning("Stylesheet asks for a font the book does not ship: %s" % missing)
+
+        self.run_parallel(self.fetch_font, wanted)
+
+    # ------------------------------------------------------------------ images
+    ATTRIBUTE_REF_RE = re.compile(
+        r"""(\s(?:src|href|xlink:href|poster|data)\s*=\s*)(["'])([^"']*)\2""", re.IGNORECASE)
+    URL_REF_RE = re.compile(r"""url\(\s*(["']?)([^)"']+?)\1\s*\)""", re.IGNORECASE)
+    DOCUMENT_EXTENSIONS = (".xhtml", ".html", ".htm", ".css")
+
+    def document_files(self):
+        """OEBPS paths of every downloaded XHTML/HTML/CSS file."""
+        found = []
+        for dirpath, _, filenames in os.walk(self.oebps_path):
+            for name in filenames:
+                if name.lower().endswith(self.DOCUMENT_EXTENSIONS):
+                    full = os.path.join(dirpath, name)
+                    found.append(os.path.relpath(full, self.oebps_path).replace(os.sep, "/"))
+
+        return sorted(found)
+
+    @staticmethod
+    def references_in(text, base_path):
+        refs = set()
+        for match in SafariBooks.ATTRIBUTE_REF_RE.finditer(text):
+            path = SafariBooks.resolve_local(base_path, unescape(match.group(3)))
+            if path:
+                refs.add(path)
+
+        for match in SafariBooks.URL_REF_RE.finditer(text):
+            path = SafariBooks.resolve_local(base_path, unescape(match.group(2)))
+            if path:
+                refs.add(path)
+
+        return refs
+
+    def referenced_paths(self, only_chapters=False):
+        refs = set()
+        for path in self.document_files():
+            if only_chapters and path.lower().endswith(".css"):
+                continue
+
+            with open(self.destination(path), encoding="utf-8", errors="replace") as document:
+                refs |= self.references_in(document.read(), path)
+
+        return refs
+
+    @staticmethod
+    def cover_image_paths(opf_bytes, opf_path):
+        """The cover image(s) the publisher's OPF declares (`cover-image` property or <meta name=cover>)."""
+        try:
+            root = etree.fromstring(opf_bytes)
+        except etree.XMLSyntaxError:
+            return set()
+
+        ns = {"opf": SafariBooks.OPF_NS}
+        items = {i.get("id"): i for i in root.findall("opf:manifest/opf:item", ns)}
+        wanted = [i for i in items.values() if "cover-image" in (i.get("properties") or "").split()]
+        for meta in root.findall("opf:metadata/opf:meta", ns):
+            if meta.get("name") == "cover" and meta.get("content") in items:
+                wanted.append(items[meta.get("content")])
+
+        paths = set()
+        for item in wanted:
+            path = SafariBooks.resolve_local(opf_path, item.get("href"))
+            if path:
+                paths.add(path)
+
+        return paths
+
+    def cover_paths(self):
+        with open(self.destination(self.opf_path), "rb") as opf:
+            return self.cover_image_paths(opf.read(), self.opf_path)
+
+    def collect_images(self):
+        if self.args.no_optimize_images:
+            wanted = self.plan["image"]  # faithful mirror: the publisher's images, untouched
+        else:
+            # Only what the pages (or their CSS) actually use, plus the cover: the same result as
+            # downloading everything and then pruning, without the wasted transfers.
+            needed = self.referenced_paths() | self.cover_paths()
+            wanted = [e for e in self.plan["image"] if e["path"] in needed]
+
+        self.abort_on_errors(self.run_parallel(self.fetch_binary, wanted), "image(s)")
+
+    @staticmethod
+    def rewrite_refs_in_text(text, base_path, rename_map):
+        """Point every reference to a renamed file at its new name, editing the text in place."""
+        def renamed(value):
+            path = SafariBooks.resolve_local(base_path, unescape(value))
+            if path not in rename_map:
+                return value
+
+            parts = urlsplit(value)
+            head = parts.path[:len(parts.path) - len(posixpath.basename(parts.path))]
+            return (head + quote(posixpath.basename(rename_map[path]))
+                    + ("?" + parts.query if parts.query else "") + ("#" + parts.fragment if parts.fragment else ""))
+
+        text = SafariBooks.ATTRIBUTE_REF_RE.sub(
+            lambda m: m.group(1) + m.group(2) + renamed(m.group(3)) + m.group(2), text)
+        return SafariBooks.URL_REF_RE.sub(lambda m: "url(" + m.group(1) + renamed(m.group(2)) + m.group(1) + ")", text)
+
+
+    @staticmethod
+    def needs_jpg_conversion(filename):
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        return ext not in ("jpg", "jpeg", "svg")
+
+
+    @staticmethod
+    def convert_image_to_jpg(src_path, dest_path):
+        with Image.open(src_path) as img:
+            if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+                img = img.convert("RGBA")
+                background = Image.new("RGB", img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[-1])
+                img = background
+
+            elif img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
+
+            img.save(dest_path, "JPEG")
+
+
+    @staticmethod
+    def unique_jpg_path(path, taken):
+        stem, ext = posixpath.splitext(path)
+        candidate = stem + ".jpg"
+        if candidate in taken:  # a.png next to a.jpg: never overwrite the publisher's own file
+            candidate = "%s_%s.jpg" % (stem, ext.lstrip(".").lower())
+
+        return candidate
+
+    def finalize_images(self):
+        on_disk = [e["path"] for e in self.plan["image"] if os.path.isfile(self.destination(e["path"]))]
+        taken = set(on_disk)
+        rename_map = {}
+        for path in sorted(on_disk):
+            if not self.needs_jpg_conversion(path):
+                continue
+
+            new_path = self.unique_jpg_path(path, taken)
+            try:
+                self.convert_image_to_jpg(self.destination(path), self.destination(new_path))
+
+            except (OSError, Image.DecompressionBombError) as conversion_error:
+                self.display.error("Unable to convert image `%s`: %s" % (path, conversion_error))
+                continue
+
+            os.remove(self.destination(path))
+            taken.discard(path)
+            taken.add(new_path)
+            rename_map[path] = new_path
+
+        if rename_map:
+            self.rename_map.update(rename_map)
+            for path in self.document_files():
+                with open(self.destination(path), encoding="utf-8", errors="replace") as document:
+                    original = document.read()
+
+                updated = self.rewrite_refs_in_text(original, path, rename_map)
+                if updated != original:
+                    self.save_text(path, updated)
+
+        # Chapters only: a stylesheet that mentions an image does not make it part of the book text,
+        # but it must still keep the image alive (below).
+        chapter_refs = self.referenced_paths(only_chapters=True)
+        cover = self.cover_paths() | {rename_map.get(p, p) for p in self.cover_paths()}
+        candidates = [p for p in (rename_map.get(p, p) for p in on_disk)
+                      if p not in cover and os.path.isfile(self.destination(p))]
+        if candidates and not chapter_refs and self.chapters_exist():
+            # Images were downloaded for chapters, yet no chapter references any of them: the scanner
+            # is out of sync with the markup, not the book image-free. Pruning deleted every image of a
+            # real book once; never do that again.
+            self.display.error("No image references recognised in the chapters; skipping unused-image pruning.")
+            return
+
+        referenced = self.referenced_paths()
+        for path in candidates:
+            if path not in referenced:
+                os.remove(self.destination(path))
+
+    def chapters_exist(self):
+        return any(os.path.isfile(self.destination(e["path"])) for e in self.plan["chapter"])
+
+    # ------------------------------------------------------------------ fixed-layout books
+
+    @staticmethod
+    def is_fixed_layout_page(content_root):
+        """True for a PDF-style page: absolutely positioned text lines, or a bare page image."""
+        return bool(content_root.xpath(SafariBooks.FIXED_LAYOUT_LINE_XPATH) or
+                    content_root.xpath(SafariBooks.FIXED_LAYOUT_PAGE_XPATH))
+
+
+    @staticmethod
+    def detect_page_size(css_text):
+        """(width, height) in px of the page canvas, read from the publisher's `img{...}` rule."""
+        match = SafariBooks.PAGE_SIZE_RE.search(css_text or "")
+        return (int(match.group(1)), int(match.group(2))) if match else SafariBooks.DEFAULT_PAGE_SIZE
+
+
+    @staticmethod
+    def fixed_layout_stylesheet(size):
+        """Replacement for Style_Base.css: pin the page image to the canvas the text is placed on.
+
+        The reflowable rule (`img{height:auto;max-width:100%}`) shrinks the page image while the
+        text lines keep their pixel coordinates, and the publisher's `z-index:-1` puts the image
+        behind <body>, so any opaque reader background hides every illustration.
+        """
+        width, height = size
+        return ("html,body{margin:0!important;padding:0!important;background-color:transparent!important;}"
+                "#sbo-rt-content .t,#sbo-rt-content .t *{background-color:transparent!important;}"
+                "#sbo-rt-content{position:relative!important;isolation:isolate;overflow:hidden;"
+                "width:%(w)spx;height:%(h)spx;}"
+                "#sbo-rt-content img{position:absolute!important;left:0!important;top:0!important;"
+                "width:%(w)spx!important;height:%(h)spx!important;max-width:none!important;"
+                "z-index:0!important;}" % {"w": width, "h": height})
+
+
+    @staticmethod
+    def _format_px(value):
+        text = ("%.3f" % value).rstrip("0").rstrip(".")
+        return (text if text not in ("", "-0") else "0") + "px"
+
+
+    @staticmethod
+    def bake_fixed_layout_scale(css_text):
+        """Apply the publisher's `transform: scale(.25)` to the numbers instead of the transform.
+
+        PDF-derived books lay each text line out at 4x size and shrink it with a CSS transform.
+        Readers that ignore, clamp or re-scale transforms then draw every line four times too
+        large. Multiplying font-size and spacing by the scale and dropping the transform renders
+        the same in a browser and does not depend on transform support. Positions (left/top) are
+        untouched because the transform origin is the top-left corner.
+        """
+        if not SafariBooks.BAKE_SCALE_RE.search(css_text or ""):
+            return css_text
+
+        scale = SafariBooks.FIXED_LAYOUT_SCALE
+
+        def scale_length(match):
+            return SafariBooks._format_px(float(match.group(1)) * scale)
+
+        def rewrite(match):
+            selector, body = match.group(1), match.group(2)
+            if selector.lstrip().startswith("@"):
+                return match.group(0)
+
+            declarations = []
+            for item in body.split(";"):
+                if ":" not in item:
+                    if item.strip():
+                        declarations.append(item)
+                    continue
+                name, value = item.split(":", 1)
+                key = name.strip().lower()
+                if key.endswith("transform") and SafariBooks.BAKE_SCALE_RE.search(value):
+                    def keep_stretch(scale_match):
+                        # scale(a,.25): the .25 is the shrink baked into the numbers, a/.25 is what is left
+                        pair = SafariBooks.BAKE_ANISOTROPIC_RE.match(scale_match.group(0))
+                        if not pair:
+                            return ""
+                        return "scale(%g,%g)" % (round(float(pair.group(1)) / scale, 3),
+                                                 round(float(pair.group(2)) / scale, 3))
+
+                    value = SafariBooks.BAKE_SCALE_RE.sub(keep_stretch, value).strip()
+                    if not value:
+                        continue
+                elif (key in SafariBooks.BAKE_LENGTH_PROPS
+                      and SafariBooks.BAKE_TEXT_SELECTOR_RE.search(selector)):
+                    value = re.sub(r"(-?\d*\.?\d+)px", scale_length, value)
+                elif (key == "color" and "!important" not in value
+                      and SafariBooks.BAKE_TEXT_SELECTOR_RE.search(selector)):
+                    # Text sits on a page IMAGE, so a reader forcing its own theme colour makes it
+                    # unreadable (white on white). An id/class selector plus !important out-ranks a
+                    # reader's `body *{color:...!important}` override.
+                    value = value.strip() + "!important"
+                declarations.append("%s:%s" % (name, value))
+            return "%s{%s}" % (selector, ";".join(declarations))
+
+        return SafariBooks.BAKE_RULE_RE.sub(rewrite, css_text)
+
+
+    def prepare_fixed_layout(self):
+        """Swap in the fixed-layout base stylesheet and give every page an EPUB 3 viewport."""
+        if not self.fixed_layout:
+            return
+
+        sheets = [p for p in self.plan_stylesheets(self.plan) if os.path.isfile(self.destination(p))]
+        size = self.DEFAULT_PAGE_SIZE
+        for path in sheets:
+            with open(self.destination(path), encoding="utf-8", errors="replace") as css_file:
+                match = self.PAGE_SIZE_RE.search(css_file.read())
+            if match:
+                size = (int(match.group(1)), int(match.group(2)))
+                break
+
+        self.page_size = size
+        for path in sheets:
+            with open(self.destination(path), encoding="utf-8", errors="replace") as css_file:
+                original = css_file.read()
+
+            baked = self.bake_fixed_layout_scale(original)
+            if baked != original:
+                self.save_text(path, baked)
+
+        os.makedirs(self.css_path, exist_ok=True)
+        with open(os.path.join(self.css_path, "Style_Base.css"), "w", encoding="utf-8") as base:
+            base.write(self.fixed_layout_stylesheet(size))
+
+        viewport = "<meta name=\"viewport\" content=\"width=%d, height=%d\"/>\n" % size
+        for entry in self.plan["chapter"]:
+            file_path = self.destination(entry["path"])
+            if not os.path.isfile(file_path) or entry["path"].endswith("nav.xhtml"):
+                continue
+
+            with open(file_path, encoding="utf-8") as page_file:
+                page = page_file.read()
+            if "name=\"viewport\"" in page or "</head>" not in page:
+                continue
+
+            self.save_text(entry["path"], page.replace("</head>", viewport + "</head>", 1))
+
+
+    def should_polish(self, args):
+        # ebook-polish prunes "unused" CSS and recompresses images; the positioned-text CSS and
+        # per-page images of a fixed-layout book are exactly what it must not touch.
+        return not args.no_optimize_images and not self.fixed_layout
+
+
+    @staticmethod
+    def polish_epub(epub_path, display):
+        binary = shutil.which("ebook-polish")
+        if not binary:
+            display.info("Calibre's `ebook-polish` not found; skipping optional CSS/image polish step.")
+            return False
+
+        tmp_path = epub_path + ".polishing"
+        result = subprocess.run([binary, "-u", "-i", epub_path, tmp_path], capture_output=True, text=True)
+        if result.returncode != 0:
+            display.error("Calibre polish failed: %s" % result.stderr)
+            if os.path.isfile(tmp_path):
+                os.remove(tmp_path)
+
+            return False
+
+        os.replace(tmp_path, epub_path)
+        return True
+
+
+    @staticmethod
+    def optional_dc_element(tag, value):
+        """`<dc:tag>value</dc:tag>\n`, or nothing when value is blank.
+
+        Empty Dublin Core elements make readers show "Unknown" instead of leaving the field unset.
+        """
+        value = (value or "").strip()
+        return "<dc:{0}>{1}</dc:{0}>\n".format(tag, escape(value)) if value else ""
+
+
+    # ------------------------------------------------------------------ package document
+    @staticmethod
+    def manifest_media_type(path):
+        ext = posixpath.splitext(path)[1].lower()
+        return (SafariBooks.OTHER_MEDIA_TYPES.get(ext) or SafariBooks.FONT_MEDIA_TYPES.get(ext)
+                or mimetypes.guess_type(path)[0] or "application/octet-stream")
+
+    @staticmethod
+    def opf_has_nav(opf_bytes):
+        root = etree.fromstring(opf_bytes)
+        return any("nav" in (i.get("properties") or "").split()
+                   for i in root.findall("{%s}manifest/{%s}item" % (SafariBooks.OPF_NS, SafariBooks.OPF_NS)))
+
+    @staticmethod
+    def nav_from_ncx(ncx_bytes, ncx_path, nav_path, title):
+        """EPUB 3 nav document built from the publisher's NCX; None when the NCX has no entries."""
+        root = etree.fromstring(ncx_bytes)
+        ns = {"n": SafariBooks.NCX_NS}
+        nav_dir = posixpath.dirname(nav_path) or "."
+
+        def walk(points):
+            markup = "<ol>\n"
+            for point in points:
+                content = point.find("n:content", ns)
+                label = " ".join(point.xpath("string(n:navLabel/n:text)", namespaces=ns).split())
+                if content is None or not content.get("src"):
+                    continue
+
+                target, _, fragment = content.get("src").partition("#")
+                href = quote(posixpath.relpath(
+                    posixpath.normpath(posixpath.join(posixpath.dirname(ncx_path), unquote(target))), nav_dir))
+                if fragment:
+                    href += "#" + fragment
+
+                markup += "<li><a href=\"{0}\">{1}</a>".format(escape(href, quote=True), escape(label))
+                children = point.findall("n:navPoint", ns)
+                if children:
+                    markup += "\n" + walk(children)
+
+                markup += "</li>\n"
+
+            return markup + "</ol>\n"
+
+        points = root.findall("n:navMap/n:navPoint", ns)
+        if not points:
+            return None
+
+        return SafariBooks.NAV_XHTML.format(escape(title), walk(points))
+
+    @staticmethod
+    def patch_opf_document(opf_bytes, opf_path, oebps_path, book_info, rename_map=None, fixed_layout=False,
+                           nav_path=None, now=None):
+        """Bring the publisher's OPF in line with what was actually downloaded.
+
+        Title and language become those of the edition downloaded (translated editions keep the original
+        edition's metadata in the OPF), blank Dublin Core elements go, missing creator/publisher are filled
+        from the book info, the manifest is reconciled with the files on disk (converted images renamed,
+        pruned files dropped, our own files added) and a fixed-layout book gets its EPUB 3 metadata."""
+        opf = "{%s}" % SafariBooks.OPF_NS
+        dc = "{%s}" % SafariBooks.DC_NS
+        ns = {"opf": SafariBooks.OPF_NS, "dc": SafariBooks.DC_NS}
+        rename_map = rename_map or {}
+        root = etree.fromstring(opf_bytes)
+        metadata, manifest, spine = (root.find("opf:" + n, ns) for n in ("metadata", "manifest", "spine"))
+        if metadata is None or manifest is None or spine is None:
+            raise ValueError("the package document has no metadata, manifest or spine")
+
+        def set_first(tag, value, property_name):
+            found = metadata.findall("dc:" + tag, ns)
+            if found:
+                found[0].text = value
+            else:
+                created = etree.Element(dc + tag)
+                created.text = value
+                metadata.insert(0, created)
+
+            for meta in metadata.findall("opf:meta", ns):
+                if meta.get("property") == property_name:
+                    meta.text = value
+
+        title = (book_info.get("title") or "").strip()
+        if title:
+            set_first("title", title, "dcterms:title")
+
+        language = (book_info.get("language") or "").strip()
+        if language:
+            set_first("language", language, "dcterms:language")
+
+        for element in list(metadata):
+            if isinstance(element.tag, str) and element.tag.startswith(dc) and len(element) == 0 \
+                    and not (element.text or "").strip():
+                metadata.remove(element)
+
+        def add_after_title(tag, value, **attributes):
+            element = etree.Element(dc + tag, attributes)
+            element.text = value
+            titles = metadata.findall("dc:title", ns)
+            metadata.insert(list(metadata).index(titles[-1]) + 1 if titles else 0, element)
+
+        if not any((e.text or "").strip() for e in metadata.findall("dc:creator", ns)):
+            for author in book_info.get("authors") or []:
+                name = (author.get("name") or "").strip()
+                if name and name != "n/a":
+                    add_after_title("creator", name)
+
+        publishers = ", ".join((p.get("name") or "").strip() for p in book_info.get("publishers") or []
+                               if (p.get("name") or "").strip())
+        if publishers and not any((e.text or "").strip() for e in metadata.findall("dc:publisher", ns)):
+            add_after_title("publisher", publishers)
+
+        opf_dir = posixpath.dirname(opf_path)
+        spine_ids = {ref.get("idref") for ref in spine.findall("opf:itemref", ns)}
+        known = set()
+        for item in list(manifest.findall("opf:item", ns)):
+            path = SafariBooks.resolve_local(opf_path, item.get("href"))
+            if path is None:
+                continue
+
+            if path in rename_map:
+                path = rename_map[path]
+                item.set("href", quote(posixpath.relpath(path, opf_dir or ".")))
+                item.set("media-type", "image/jpeg")
+
+            if not os.path.isfile(os.path.join(oebps_path, *path.split("/"))):
+                if item.get("id") in spine_ids:
+                    raise ValueError("spine item %s is missing from the download" % path)
+
+                manifest.remove(item)
+                continue
+
+            known.add(path)
+
+        ids = {i.get("id") for i in manifest.findall("opf:item", ns)}
+        for dirpath, dirnames, filenames in os.walk(oebps_path):
+            dirnames.sort()
+            for name in sorted(filenames):
+                path = os.path.relpath(os.path.join(dirpath, name), oebps_path).replace(os.sep, "/")
+                if path == opf_path or path in known or name.endswith((".part", ".tmp")):
+                    continue
+
+                item_id = "sb_" + re.sub(r"[^A-Za-z0-9_.-]", "_", path)
+                while item_id in ids:
+                    item_id += "_"
+
+                ids.add(item_id)
+                attributes = {"id": item_id, "href": quote(posixpath.relpath(path, opf_dir or ".")),
+                              "media-type": SafariBooks.manifest_media_type(path)}
+                if nav_path and path == nav_path:
+                    attributes["properties"] = "nav"
+
+                etree.SubElement(manifest, opf + "item", attributes)
+                known.add(path)
+
+        items = {i.get("id"): i for i in manifest.findall("opf:item", ns)}
+        for meta in list(metadata.findall("opf:meta", ns)):
+            if meta.get("name") == "cover" and meta.get("content") not in items:
+                # <meta name="cover"> must name a manifest item; a dangling one shows no cover at all.
+                candidate = next((i for i in items.values() if "cover-image" in (i.get("properties") or "").split()),
+                                 None) or next((i for i in items.values()
+                                                if (i.get("media-type") or "").startswith("image/")
+                                                and "cover" in (i.get("href") or "").lower()), None)
+                if candidate is not None:
+                    meta.set("content", candidate.get("id"))
+                else:
+                    metadata.remove(meta)
+
+        if fixed_layout:
+            root.set("version", "3.0")
+
+            def ensure_property(name, value):
+                for meta in metadata.findall("opf:meta", ns):
+                    if meta.get("property") == name:
+                        meta.text = value if name.startswith("rendition:") else meta.text
+                        return
+
+                created = etree.SubElement(metadata, opf + "meta", {"property": name})
+                created.text = value
+
+            ensure_property("dcterms:modified",
+                            (now or datetime.datetime.now(datetime.timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ"))
+            ensure_property("rendition:layout", "pre-paginated")
+            ensure_property("rendition:spread", "none")
+            for meta in metadata.findall("opf:meta", ns):
+                cover = items.get(meta.get("content")) if meta.get("name") == "cover" else None
+                if cover is not None and "cover-image" not in (cover.get("properties") or "").split():
+                    cover.set("properties", ((cover.get("properties") or "") + " cover-image").strip())
+
+            if not any("nav" in (i.get("properties") or "").split() for i in items.values()):
+                raise ValueError("a fixed-layout book needs a navigation document and none was found or built")
+
+        return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+    @staticmethod
+    def write_epub_archive(book_path, epub_path):
+        """Zip book_path into an OCF-compliant EPUB: stored `mimetype` first, no dir entries."""
+        tmp_path = epub_path + ".tmp"
+        with zipfile.ZipFile(tmp_path, "w") as z:
+            z.write(os.path.join(book_path, "mimetype"), "mimetype", compress_type=zipfile.ZIP_STORED)
+            for dirpath, dirnames, filenames in os.walk(book_path):
+                dirnames.sort()
+                for name in sorted(filenames):
+                    full = os.path.join(dirpath, name)
+                    arcname = os.path.relpath(full, book_path).replace(os.sep, "/")
+                    # Skip mimetype (already written first) and any EPUB left at the top
+                    # level by a previous run, which would otherwise be packed into this one.
+                    if arcname == "mimetype" or ("/" not in arcname and name.endswith((".epub", ".tmp"))):
+                        continue
+                    z.write(full, arcname, compress_type=zipfile.ZIP_DEFLATED)
+        os.replace(tmp_path, epub_path)
+
 
     def create_epub(self):
         open(os.path.join(self.BOOK_PATH, "mimetype"), "w").write("application/epub+zip")
@@ -1036,25 +1917,63 @@ class SafariBooks:
         else:
             os.makedirs(meta_info)
 
+        opf_file = self.destination(self.opf_path)
+        with open(opf_file, "rb") as opf:
+            opf_bytes = opf.read()
+
+        nav_path = None
+        if self.fixed_layout and not self.opf_has_nav(opf_bytes) and self.ncx_path:
+            candidate = posixpath.join(posixpath.dirname(self.opf_path), "nav.xhtml")
+            with open(self.destination(self.ncx_path), "rb") as ncx:
+                nav = self.nav_from_ncx(ncx.read(), self.ncx_path, candidate, self.book_title)
+
+            if nav is None:
+                self.display.warning("The table of contents is empty; the fixed-layout EPUB has no nav document.")
+            else:
+                self.save_text(candidate, nav)
+                nav_path = candidate
+
+        try:
+            patched = self.patch_opf_document(
+                opf_bytes, self.opf_path, self.oebps_path, self.book_info, self.rename_map,
+                self.fixed_layout, nav_path
+            )
+        except ValueError as invalid:
+            self.display.exit("Package document: %s" % invalid)
+
+        with open(opf_file, "wb") as opf:
+            opf.write(patched)
+
         open(os.path.join(meta_info, "container.xml"), "wb").write(
-            self.CONTAINER_XML.encode("utf-8", "xmlcharrefreplace")
-        )
-        open(os.path.join(self.BOOK_PATH, "OEBPS", "content.opf"), "wb").write(
-            self.create_content_opf().encode("utf-8", "xmlcharrefreplace")
-        )
-        open(os.path.join(self.BOOK_PATH, "OEBPS", "toc.ncx"), "wb").write(
-            self.create_toc().encode("utf-8", "xmlcharrefreplace")
+            self.CONTAINER_XML.format(self.opf_path).encode("utf-8", "xmlcharrefreplace")
         )
 
-        zip_file = os.path.join(PATH, "Books", self.book_id)
-        if os.path.isfile(zip_file + ".zip"):
-            os.remove(zip_file + ".zip")
+        epub_path = os.path.join(self.BOOK_PATH, self.book_id) + ".epub"
+        self.write_epub_archive(self.BOOK_PATH, epub_path)
 
-        shutil.make_archive(zip_file, 'zip', self.BOOK_PATH)
-        os.rename(zip_file + ".zip", os.path.join(self.BOOK_PATH, self.book_id) + ".epub")
+        if self.should_polish(self.args):
+            self.polish_epub(epub_path, self.display)
+
+    def create_dirs(self):
+        if os.path.isdir(self.BOOK_PATH):
+            self.display.log("Book directory already exists: %s" % self.BOOK_PATH)
+
+        else:
+            os.makedirs(self.BOOK_PATH)
+
+        self.oebps_path = os.path.join(self.BOOK_PATH, "OEBPS")
+        if not os.path.isdir(self.oebps_path):
+            self.display.book_ad_info = True
+            os.makedirs(self.oebps_path)
+
+        self.css_path = os.path.join(self.oebps_path, self.OWN_STYLES_DIR)
+        os.makedirs(self.css_path, exist_ok=True)
+
+        open(os.path.join(self.css_path, "Style_Base.css"), "w", encoding="utf-8").write(self.BASE_STYLE_CSS)
+        if self.args.kindle:
+            open(os.path.join(self.css_path, "Style_Kindle.css"), "w", encoding="utf-8").write(self.KINDLE_STYLE_CSS)
 
 
-# MAIN
 if __name__ == "__main__":
     arguments = argparse.ArgumentParser(prog="safaribooks.py",
                                         description="Download and generate an EPUB of your favorite books"
@@ -1085,6 +2004,16 @@ if __name__ == "__main__":
     arguments.add_argument(
         "--preserve-log", dest="log", action='store_true', help="Leave the `info_XXXXXXXXXXXXX.log`"
                                                                 " file even if there isn't any error."
+    )
+    arguments.add_argument(
+        "--no-optimize-images", dest="no_optimize_images", action='store_true',
+        help="Skip converting images to JPEG, pruning unused images, and running Calibre's"
+             " `ebook-polish` (unused CSS removal + lossless image compression) at the end of the download."
+    )
+    arguments.add_argument(
+        "--no-optimize-css", dest="no_optimize_css", action='store_true',
+        help="Skip removing the `color` CSS property from stylesheets and inline `style` attributes"
+             " (kept to avoid breaking E-Reader light/dark themes by default)."
     )
     arguments.add_argument("--help", action="help", default=argparse.SUPPRESS, help='Show this help message.')
     arguments.add_argument(

@@ -31,7 +31,7 @@ Log in through your browser and hand the session to the script as `cookies.json`
   * [Example: Use or not the `--kindle` option](#use-or-not-the---kindle-option)
 
 ## Requirements & Setup:
-First of all, it requires [`uv`](https://docs.astral.sh/uv/) to be installed (it will fetch Python 3.14 by itself).  
+First of all, it requires [`uv`](https://docs.astral.sh/uv/) to be installed (it will fetch a suitable Python, 3.12 or newer, by itself).  
 ```shell
 $ git clone https://github.com/jbonadiman/safaribooks.git
 Cloning into 'safaribooks'...

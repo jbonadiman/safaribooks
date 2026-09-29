@@ -1,0 +1,19 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install (Python from .python-version, locked deps)
+        run: uv sync --locked
+      - name: Offline test suite (no network, no cookies)
+        run: uv run pytest tests -q -W error::FutureWarning

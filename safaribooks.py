@@ -1778,11 +1778,16 @@ class SafariBooks:
                     and not (element.text or "").strip():
                 metadata.remove(element)
 
+        added_after_title = []
+
         def add_after_title(tag, value, **attributes):
+            """Insert right after the title, in call order (several authors keep their order)."""
             element = etree.Element(dc + tag, attributes)
             element.text = value
             titles = metadata.findall("dc:title", ns)
-            metadata.insert(list(metadata).index(titles[-1]) + 1 if titles else 0, element)
+            anchor = added_after_title[-1] if added_after_title else (titles[-1] if titles else None)
+            metadata.insert(list(metadata).index(anchor) + 1 if anchor is not None else 0, element)
+            added_after_title.append(element)
 
         if not any((e.text or "").strip() for e in metadata.findall("dc:creator", ns)):
             for author in book_info.get("authors") or []:
@@ -1843,9 +1848,11 @@ class SafariBooks:
             if meta.get("name") == "cover" and meta.get("content") not in items:
                 # <meta name="cover"> must name a manifest item; a dangling one shows no cover at all.
                 candidate = next((i for i in items.values() if "cover-image" in (i.get("properties") or "").split()),
-                                 None) or next((i for i in items.values()
-                                                if (i.get("media-type") or "").startswith("image/")
-                                                and "cover" in (i.get("href") or "").lower()), None)
+                                 None)
+                if candidate is None:  # explicit test: an <item/> with no children is falsy in lxml
+                    candidate = next((i for i in items.values()
+                                      if (i.get("media-type") or "").startswith("image/")
+                                      and "cover" in (i.get("href") or "").lower()), None)
                 if candidate is not None:
                     meta.set("content", candidate.get("id"))
                 else:

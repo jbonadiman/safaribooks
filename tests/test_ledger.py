@@ -66,6 +66,25 @@ def test_base_stylesheet_gives_headings_room_between_lines():
     assert float(line_height.group(1)) >= 1.2
 
 
+def test_base_stylesheet_centres_a_figure_with_its_caption():
+    css = SafariBooks.BASE_STYLE_CSS
+
+    # the publisher tags the image class="center" but its CSS never defines it, so the figure
+    # hugs the left edge while the paragraphs around it are indented
+    image = re.search(r"#sbo-rt-content img\.center\{([^}]*)\}", css)
+    assert image is not None
+    assert re.sub(r"\s", "", image.group(1)) == "display:block;margin:0auto;"
+
+    # shrink-wrapping the <figure> keeps the caption under the image instead of the page edge;
+    # a separate rule, so a reader without :has() still gets the centred image above
+    figure = re.search(r"#sbo-rt-content figure:has\(img\.center\)\{([^}]*)\}", css)
+    assert figure is not None
+    props = dict(p.split(":") for p in re.sub(r"\s", "", figure.group(1)).split(";") if p)
+    assert props["width"] == "fit-content"
+    assert props["max-width"] == "100%"
+    assert props["margin-left"] == props["margin-right"] == "auto!important"
+
+
 def test_base_stylesheet_is_written_into_every_book(tmp_path):
     book = make_book(tmp_path)
     book.create_dirs()

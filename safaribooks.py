@@ -270,7 +270,10 @@ class SafariBooks:
 
     BASE_STYLE_CSS = "body{margin:1em;background-color:transparent!important;}" \
                      "#sbo-rt-content *{text-indent:0pt!important;}#sbo-rt-content .bq{margin-right:1em!important;}" \
-                     "#sbo-rt-content img{height:auto!important;max-width:100%!important;}"
+                     "#sbo-rt-content img{height:auto!important;max-width:100%!important;}" \
+                     "#sbo-rt-content pre{line-height:1.35!important;}" \
+                     "#sbo-rt-content h1,#sbo-rt-content h2,#sbo-rt-content h3,#sbo-rt-content h4," \
+                     "#sbo-rt-content h5,#sbo-rt-content h6{line-height:1.25!important;}"
     # Fixed-layout ("PDF-style") books: every page is a fixed-size canvas holding a page-sized
     # <img> plus one absolutely positioned <span class="t"> per text line.
     DEFAULT_PAGE_SIZE = (770, 1017)

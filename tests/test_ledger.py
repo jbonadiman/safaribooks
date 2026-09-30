@@ -5,6 +5,7 @@
 * covers come from the publisher's OPF only, never from a chapter whose title contains "cover"
 """
 import posixpath
+import re
 
 import pytest
 
@@ -43,6 +44,26 @@ def test_base_stylesheet_keeps_the_image_aspect_ratio():
 
     # a fixed height would squash a wide image once max-width shrinks it
     assert "img{height:auto!important;max-width:100%!important;}" in css
+
+
+def test_base_stylesheet_gives_code_blocks_room_between_lines():
+    match = re.search(r"#sbo-rt-content pre\{([^}]*)\}", SafariBooks.BASE_STYLE_CSS)
+
+    # the publisher's line-height:1 clips lines when a reader paints a box per token
+    assert match is not None
+    line_height = re.search(r"line-height:\s*([\d.]+)\s*!important", match.group(1))
+    assert line_height is not None
+    assert float(line_height.group(1)) >= 1.2
+
+
+def test_base_stylesheet_gives_headings_room_between_lines():
+    match = re.search(r"((?:#sbo-rt-content h[1-6],?)+)\{([^}]*)\}", SafariBooks.BASE_STYLE_CSS)
+
+    assert match is not None
+    assert {f"h{n}" for n in range(1, 7)} == set(re.findall(r"h[1-6]", match.group(1)))
+    line_height = re.search(r"line-height:\s*([\d.]+)\s*!important", match.group(2))
+    assert line_height is not None
+    assert float(line_height.group(1)) >= 1.2
 
 
 def test_base_stylesheet_is_written_into_every_book(tmp_path):

@@ -1518,6 +1518,151 @@ class SafariBooks:
     def chapters_exist(self):
         return any(os.path.isfile(self.destination(e["path"])) for e in self.plan["chapter"])
 
+    # ------------------------------------------------------------------ front matter
+    EPUB_TYPE_ATTR = "{http://www.idpf.org/2007/ops}type"
+    COPYRIGHT_SUFFIX = "-copyright"
+
+    @staticmethod
+    def split_before_copyright(page):
+        """Cut a chapter page in two where its copyright page starts.
+
+        Publishers often put the title page and the copyright page in one file and rely on an inline
+        page break; readers that scroll (or ignore it) show them as one page. Returns None unless a
+        direct child of the content wrapper is exactly `copyright-page` and something precedes it, else
+        (first page, second page, ids left in the first, ids moved to the second)."""
+        root = etree.fromstring(page)
+        wrapper = root.xpath("//*[@id='sbo-rt-content']")
+        if not wrapper:
+            return None
+
+        children = [c for c in wrapper[0] if isinstance(c.tag, str)]
+        cut = next((i for i, c in enumerate(children)
+                    if "copyright-page" in (c.get(SafariBooks.EPUB_TYPE_ATTR) or "").split()), None)
+        if not cut:
+            return None
+
+        def render(drop):
+            tree = copy.deepcopy(root)
+            kept = tree.xpath("//*[@id='sbo-rt-content']")[0]
+            elements = [c for c in kept if isinstance(c.tag, str)]
+            for element in (elements[cut:] if drop == "second" else elements[:cut]):
+                kept.remove(element)
+
+            ids = {e.get("id") for e in kept.iterdescendants() if isinstance(e.tag, str) and e.get("id")}
+            return etree.tostring(tree, xml_declaration=True, encoding="utf-8", doctype="<!DOCTYPE html>"), ids
+
+        first, stayed = render("second")
+        second, moved = render("first")
+        return first, second, stayed, moved
+
+    @staticmethod
+    def retarget_fragments(text, base_path, old_path, new_path, moved, stayed):
+        """Point every `#fragment` link at the half of `old_path` that now holds the fragment.
+
+        `text` is a document, NCX or OPF living at `base_path`. A link is only touched when its target is
+        one of the two halves, the fragment is known, and the half holding it differs from the one named."""
+        def retarget(match):
+            value = unescape(match.group(3))
+            parts = urlsplit(value)
+            if not parts.fragment or parts.scheme or parts.netloc:
+                return match.group(0)
+
+            target = SafariBooks.resolve_local(base_path, value) if parts.path else base_path
+            if target not in (old_path, new_path):
+                return match.group(0)
+
+            if parts.fragment in moved:
+                actual = new_path
+            elif parts.fragment in stayed:
+                actual = old_path
+            else:
+                return match.group(0)
+
+            if actual == target:
+                return match.group(0)
+
+            link = "" if actual == base_path else quote(posixpath.relpath(actual, posixpath.dirname(base_path) or "."))
+            return match.group(1) + match.group(2) + escape(link + "#" + parts.fragment, quote=True) + match.group(2)
+
+        return SafariBooks.ATTRIBUTE_REF_RE.sub(retarget, text)
+
+    @staticmethod
+    def add_spine_page_after(opf_bytes, opf_path, old_path, new_path):
+        """List `new_path` in the manifest and the spine right after `old_path`; no-op when it is already
+        listed or `old_path` is not a spine page."""
+        root = etree.fromstring(opf_bytes)
+        ns = {"opf": SafariBooks.OPF_NS}
+        manifest, spine = root.find("opf:manifest", ns), root.find("opf:spine", ns)
+        if manifest is None or spine is None:
+            return opf_bytes
+
+        items = manifest.findall("opf:item", ns)
+        paths = {id(i): SafariBooks.resolve_local(opf_path, i.get("href")) for i in items}
+        old = next((i for i in items if paths[id(i)] == old_path), None)
+        old_ref = next((r for r in spine.findall("opf:itemref", ns) if old is not None and r.get("idref") == old.get("id")),
+                       None)
+        if old is None or old_ref is None or new_path in paths.values():
+            return opf_bytes
+
+        ids = {i.get("id") for i in items}
+        new_id = old.get("id") + "_copyright"
+        while new_id in ids:
+            new_id += "_"
+
+        item = etree.Element(old.tag, {k: v for k, v in old.attrib.items() if k not in ("id", "href")})
+        item.set("id", new_id)
+        item.set("href", quote(posixpath.relpath(new_path, posixpath.dirname(opf_path) or ".")))
+        old.addnext(item)
+        ref = etree.Element(old_ref.tag, {k: v for k, v in old_ref.attrib.items() if k != "idref"})
+        ref.set("idref", new_id)
+        old_ref.addnext(ref)
+        return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+    def split_front_matter(self):
+        """Give the copyright page its own spine page wherever a chapter file starts with something else."""
+        opf_file = self.destination(self.opf_path)
+        for entry in self.plan["chapter"]:
+            old_path = entry["path"]
+            if not os.path.isfile(self.destination(old_path)):
+                continue
+
+            stem, extension = posixpath.splitext(old_path)
+            new_path = stem + self.COPYRIGHT_SUFFIX + extension
+            with open(self.destination(old_path), "rb") as chapter:
+                split = self.split_before_copyright(chapter.read())
+
+            if split is None:
+                continue
+
+            first, second, stayed, moved = split
+            for path in self.document_files() + [p for p in (self.opf_path, self.ncx_path) if p]:
+                if path in (old_path, new_path) or not path.lower().endswith((".xhtml", ".html", ".htm", ".ncx", ".opf")):
+                    continue
+
+                with open(self.destination(path), encoding="utf-8") as document:
+                    text = document.read()
+
+                updated = self.retarget_fragments(text, path, old_path, new_path, moved, stayed)
+                if updated != text:
+                    self.save_text(path, updated)
+
+            # New file first, old file last: an interrupted run then still sees the unsplit original
+            # and redoes the split, instead of losing the copyright page.
+            for path, half in ((new_path, second), (old_path, first)):
+                text = self.retarget_fragments(half.decode("utf-8"), path, old_path, new_path, moved, stayed)
+                self.save_text(path, text)
+
+        with open(opf_file, "rb") as opf:
+            opf_bytes = opf.read()
+
+        for entry in self.plan["chapter"]:
+            stem, extension = posixpath.splitext(entry["path"])
+            sibling = stem + self.COPYRIGHT_SUFFIX + extension
+            if os.path.isfile(self.destination(sibling)):
+                opf_bytes = self.add_spine_page_after(opf_bytes, self.opf_path, entry["path"], sibling)
+
+        self.save_text(self.opf_path, opf_bytes.decode("utf-8"))
+
     # ------------------------------------------------------------------ fixed-layout books
 
     @staticmethod
@@ -2138,6 +2283,9 @@ class SafariBooks:
         if not self.args.no_optimize_images:
             self.display.info("Optimizing images...", state=True)
             self.finalize_images()
+
+        if not self.fixed_layout:
+            self.split_front_matter()
 
         self.prepare_fixed_layout()
 
